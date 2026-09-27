@@ -110,7 +110,27 @@ mkdir "$MODPATH/bin"
 mkdir "$MODPATH/webroot"
 
 ui_print "- Extracting webroot"
-unzip -o "$ZIPFILE" "webroot/*" -x "*.sha256" -d "$MODPATH"
+unzip -o "$ZIPFILE" "webroot/*" -d "$MODPATH" >&2
+
+ui_print "- Verifying webroot"
+WEBROOT_SUMS="$TMPDIR/webroot.sha256sums"
+: > "$WEBROOT_SUMS"
+find "$MODPATH/webroot" -type f -name '*.sha256' -exec sh -c 'printf "%s  %s\n" "$(cat "$1")" "${1%.sha256}"' _ {} \; >> "$WEBROOT_SUMS"
+
+if [ ! -s "$WEBROOT_SUMS" ]; then
+  ui_print "*********************************************************"
+  ui_print "! The webroot carries no checksums"
+  abort    "*********************************************************"
+fi
+
+if ! sha256sum -c -s "$WEBROOT_SUMS"; then
+  ui_print "*********************************************************"
+  ui_print "! Failed to verify the webroot"
+  ui_print "! This zip may be corrupted, please try downloading again"
+  abort    "*********************************************************"
+fi
+
+find "$MODPATH/webroot" -type f -name '*.sha256' -delete
 
 # INFO: Utilize the one with the biggest output, as some devices with Tango have the full list
 #         in ro.product.cpu.abilist but others only have a subset there, and the full list in
@@ -137,58 +157,61 @@ if [[ "$CPU_ABIS" == *"x86_64"* || "$CPU_ABIS" == *"arm64-v8a"* ]]; then
   ui_print "- Device supports 64-bit"
 fi
 
+if [ "$ARCH" = "x86" ] || [ "$ARCH" = "x64" ]; then
+  ABI_32=x86
+  ABI_64=x86_64
+  MACHIKADO_32=machikado.x86
+  MACHIKADO_64=machikado.x86_64
+else
+  ABI_32=armeabi-v7a
+  ABI_64=arm64-v8a
+  MACHIKADO_32=machikado.arm
+  MACHIKADO_64=machikado.arm64
+fi
+
+zip_has() {
+  unzip -l "$ZIPFILE" "$1" > /dev/null 2>&1
+}
+
+require_abi() {
+  if zip_has "bin/$1/zygiskd"; then
+    return 0
+  fi
+
+  ui_print "*********************************************************"
+  ui_print "! This device needs the $1 payload, which this build does not carry"
+  ui_print "! Rebuild with ARCHS including $1, or install a build that has it"
+  abort    "*********************************************************"
+}
+
 if [ "$SUPPORTS_32BIT" = true ]; then
+  require_abi "$ABI_32"
+
   mkdir "$MODPATH/lib"
+
+  ui_print "- Extracting $ABI_32 libraries"
+  extract "$ZIPFILE" "bin/$ABI_32/zygiskd" "$MODPATH/bin" true
+  mv "$MODPATH/bin/zygiskd" "$MODPATH/bin/zygiskd32"
+  extract "$ZIPFILE" "lib/$ABI_32/libzygisk.so" "$MODPATH/lib" true
+  extract "$ZIPFILE" "lib/$ABI_32/libzygisk_ptrace.so" "$MODPATH/bin" true
+  mv "$MODPATH/bin/libzygisk_ptrace.so" "$MODPATH/bin/zygisk-ptrace32"
+
+  extract "$ZIPFILE" "$MACHIKADO_32" "$MODPATH" true
 fi
 
 if [ "$SUPPORTS_64BIT" = true ]; then
+  require_abi "$ABI_64"
+
   mkdir "$MODPATH/lib64"
-fi
 
-if [ "$ARCH" = "x86" ] || [ "$ARCH" = "x64" ]; then
-  if [ "$SUPPORTS_32BIT" = true ]; then
-    ui_print "- Extracting x86 libraries"
-    extract "$ZIPFILE" 'bin/x86/zygiskd' "$MODPATH/bin" true
-    mv "$MODPATH/bin/zygiskd" "$MODPATH/bin/zygiskd32"
-    extract "$ZIPFILE" 'lib/x86/libzygisk.so' "$MODPATH/lib" true
-    extract "$ZIPFILE" 'lib/x86/libzygisk_ptrace.so' "$MODPATH/bin" true
-    mv "$MODPATH/bin/libzygisk_ptrace.so" "$MODPATH/bin/zygisk-ptrace32"
+  ui_print "- Extracting $ABI_64 libraries"
+  extract "$ZIPFILE" "bin/$ABI_64/zygiskd" "$MODPATH/bin" true
+  mv "$MODPATH/bin/zygiskd" "$MODPATH/bin/zygiskd64"
+  extract "$ZIPFILE" "lib/$ABI_64/libzygisk.so" "$MODPATH/lib64" true
+  extract "$ZIPFILE" "lib/$ABI_64/libzygisk_ptrace.so" "$MODPATH/bin" true
+  mv "$MODPATH/bin/libzygisk_ptrace.so" "$MODPATH/bin/zygisk-ptrace64"
 
-    extract "$ZIPFILE" 'machikado.x86' "$MODPATH" true
-  fi
-
-  if [ "$SUPPORTS_64BIT" = true ]; then
-    ui_print "- Extracting x64 libraries"
-    extract "$ZIPFILE" 'bin/x86_64/zygiskd' "$MODPATH/bin" true
-    mv "$MODPATH/bin/zygiskd" "$MODPATH/bin/zygiskd64"
-    extract "$ZIPFILE" 'lib/x86_64/libzygisk.so' "$MODPATH/lib64" true
-    extract "$ZIPFILE" 'lib/x86_64/libzygisk_ptrace.so' "$MODPATH/bin" true
-    mv "$MODPATH/bin/libzygisk_ptrace.so" "$MODPATH/bin/zygisk-ptrace64"
-
-    extract "$ZIPFILE" 'machikado.x86_64' "$MODPATH" true
-  fi
-else
-  if [ "$SUPPORTS_32BIT" = true ]; then
-    ui_print "- Extracting arm libraries"
-    extract "$ZIPFILE" 'bin/armeabi-v7a/zygiskd' "$MODPATH/bin" true
-    mv "$MODPATH/bin/zygiskd" "$MODPATH/bin/zygiskd32"
-    extract "$ZIPFILE" 'lib/armeabi-v7a/libzygisk.so' "$MODPATH/lib" true
-    extract "$ZIPFILE" 'lib/armeabi-v7a/libzygisk_ptrace.so' "$MODPATH/bin" true
-    mv "$MODPATH/bin/libzygisk_ptrace.so" "$MODPATH/bin/zygisk-ptrace32"
-
-    extract "$ZIPFILE" 'machikado.arm' "$MODPATH" true
-  fi
-
-  if [ "$SUPPORTS_64BIT" = true ]; then
-    ui_print "- Extracting arm64 libraries"
-    extract "$ZIPFILE" 'bin/arm64-v8a/zygiskd' "$MODPATH/bin" true
-    mv "$MODPATH/bin/zygiskd" "$MODPATH/bin/zygiskd64"
-    extract "$ZIPFILE" 'lib/arm64-v8a/libzygisk.so' "$MODPATH/lib64" true
-    extract "$ZIPFILE" 'lib/arm64-v8a/libzygisk_ptrace.so' "$MODPATH/bin" true
-    mv "$MODPATH/bin/libzygisk_ptrace.so" "$MODPATH/bin/zygisk-ptrace64"
-
-    extract "$ZIPFILE" 'machikado.arm64' "$MODPATH" true
-  fi
+  extract "$ZIPFILE" "$MACHIKADO_64" "$MODPATH" true
 fi
 
 ui_print "- Setting permissions"

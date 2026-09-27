@@ -7,7 +7,4 @@ rm -rf "$TMP_PATH"
 
 rm -f /data/adb/service.d/rezygisk.sh
 
-# INFO: Only removes if dir is empty
-rmdir /data/adb/service.d
-
 exit 0

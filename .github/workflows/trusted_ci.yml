@@ -4,27 +4,20 @@ on:
   push:
     branches: [ main ]
 
+permissions:
+  contents: read
+
 jobs:
   build:
     runs-on: ubuntu-latest
+    environment: signing
     steps:
       - name: Checkout
         uses: actions/checkout@v6
         with:
           submodules: "recursive"
           fetch-depth: 0
-
-      - name: Setup keys
-        env:
-          private_key: ${{ secrets.ORG_PRIVATE_KEY }}
-          public_key: ${{ secrets.ORG_PUBLIC_KEY }}
-        run: |
-          if [ -z "$private_key" ] || [ -z "$public_key" ]; then
-            echo "Private or public key is not set."
-          else
-            echo "$private_key" | base64 -d > module/private_key
-            echo "$public_key" | base64 -d > module/public_key
-          fi
+          persist-credentials: false
 
       - name: Setup NDK_PATH
         run: echo "NDK_PATH=$ANDROID_NDK_LATEST_HOME" >> $GITHUB_ENV
@@ -32,6 +25,24 @@ jobs:
       - name: Build
         run: |
           make all -j$(nproc)
+
+      - name: Sign
+        env:
+          private_key: ${{ secrets.ORG_PRIVATE_KEY }}
+          public_key: ${{ secrets.ORG_PUBLIC_KEY }}
+        run: |
+          if [ -z "$private_key" ] || [ -z "$public_key" ]; then
+            echo "Private or public key is not set, leaving the build unsigned."
+            exit 0
+          fi
+
+          echo "$private_key" | base64 -d > module/private_key
+          echo "$public_key" | base64 -d > module/public_key
+
+          make BUILD_TYPE=release sign
+          make BUILD_TYPE=debug sign
+
+          rm -f module/private_key module/public_key
 
       - name: Upload release
         uses: actions/upload-artifact@v7

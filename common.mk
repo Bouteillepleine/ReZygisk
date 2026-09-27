@@ -1,7 +1,7 @@
 ROOT_DIR ?= .
 BUILD_TYPE ?= debug
 API_LEVEL ?= 25
-ARCHS ?= arm64-v8a armeabi-v7a x86 x86_64
+ARCHS ?= arm64-v8a
 ARCH ?= arm64-v8a
 
 VER_NAME ?= v1.0.0

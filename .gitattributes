@@ -1,0 +1,9 @@
+* text=auto eol=lf
+*.sh text eol=lf
+update-binary text eol=lf
+updater-script text eol=lf
+sepolicy.rule text eol=lf
+module.prop text eol=lf
+*.png binary
+*.ttf binary
+*.svg text eol=lf

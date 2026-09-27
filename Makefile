@@ -35,7 +35,7 @@ MODULE_INPUTS = scripts/sign.py \
         $(shell find webroot -type f | sort) \
         $(wildcard module/private_key module/public_key)
 
-.PHONY: debug release build clean                                         \
+.PHONY: debug release build clean sign                                    \
         installKsu installMagisk installAPatch                            \
         installKsuAndReboot installMagiskAndReboot installAPatchAndReboot
 
@@ -136,6 +136,13 @@ installMagiskAndReboot: installMagisk
 
 installAPatchAndReboot: installAPatch
 	$(REBOOT_CMD)
+
+sign:
+	python3 scripts/sign.py $(MODULE_OUT) module/private_key module/public_key
+	@rm -f $(ZIP_FILE)
+	@mkdir -p $(ZIP_DIR)
+	@cd $(MODULE_OUT) && zip -r9 $(ZIP_FILE) . -x '*.DS_Store' > /dev/null
+	@echo "Signed $(ZIP_FILE)"
 
 clean:
 	rm -rf $(BUILD_DIR)
