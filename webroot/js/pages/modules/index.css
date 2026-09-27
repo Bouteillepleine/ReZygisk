@@ -1,9 +1,44 @@
 .not_avaliable {
-  position: fixed;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
-  font-size: 1.2em;
+  gap: 8px;
+  min-height: 55vh;
+  padding: 0 32px;
+  font-size: 1.02rem;
   text-align: center;
-  top: 0; left: 30px; right: 30px; bottom: 0;
+  color: var(--desc);
+}
+
+#modules_list {
+  display: flex;
+  flex-direction: column;
+}
+
+.module_card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.module_name {
+  font-size: 1.04rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  word-break: break-word;
+}
+
+.module_meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.module_meta_label {
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--desc);
 }

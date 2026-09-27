@@ -1,6 +1,6 @@
 /* INFO: Code shared with settings page */
 .dimc {
-  background: var(--dim);
+  background-color: transparent;
   word-break: break-word;
 }
 
@@ -16,39 +16,50 @@
   display: flex;
 }
 
+.monitor_state {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 12px 4px 22px;
+}
+
+.monitor_title {
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--desc);
+}
+
+.monitor_status {
+  font-size: 1.5rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
 .button_list {
   display: grid;
-  grid-template-columns: 1fr 1fr 1fr;
-  column-gap: 20px;
+  grid-template-columns: 1fr;
+  gap: 10px;
 }
 
-.button {
-  padding: 1em 0 1em 0;
-  border-radius: 30px;
-  transition: transform 0.1s ease-in-out;
-  background-color: var(--button);
+.button_primary {
+  background-color: var(--button-enabled);
+  border-color: transparent;
+  color: var(--lock);
 }
 
-.button:active {
-  transform: scale(90%);
+.button_primary:active {
+  background-color: var(--button-enabled);
+  filter: brightness(1.12);
 }
 
-/* Responsive CSS */
-@media only screen and (max-width: 600px) {
+.button_danger {
+  color: #e59aa4;
+}
+
+@media (min-width: 560px) {
   .button_list {
-    display: grid;
-    grid-template-columns: 1fr;
-    column-gap: 20px;
-  }
-  .button {
-    padding: 25px 0 25px 0;
-    border-radius: 40px;
-    margin: 0.5em 0 0.5em;
-    transition: transform 0.15s ease-in-out;
-    background-color: var(--button);
-    font-size: 18px;
-  }
-  .button:active {
-    transform: scale(90%);
+    grid-template-columns: repeat(3, 1fr);
   }
 }

@@ -1,10 +1,10 @@
 .loader {
-  border: 6px solid var(--icon-bc);
-  border-top: 6px solid var(--icon);
+  width: 2.4em;
+  height: 2.4em;
   border-radius: 50%;
-  width: 3em;
-  height: 3em;
-  animation: spin 0.8s linear infinite;
+  border: 3px solid var(--outline);
+  border-top-color: var(--button-enabled);
+  animation: spin 0.7s linear infinite;
 }
 
 #loading_screen {
@@ -21,7 +21,7 @@
 }
 
 .nav_dimc {
-  background: var(--dim);
+  background-color: transparent;
   word-break: break-word;
 }
 
@@ -44,54 +44,79 @@
   display: flex;
   position: fixed;
   z-index: 7;
-  align-items: center;
-  justify-content: space-between;
-  background-color: var(--dim);
+  align-items: stretch;
+  justify-content: space-around;
   left: 0; right: 0; bottom: 0;
-  padding: 20px 25px;
-  font-size: 20px;
+  padding: 10px 8px calc(10px + var(--window-inset-bottom, 0px));
+  background-color: var(--desktop-navbar);
+  border-top: 1px solid var(--outline);
+  font-size: 1rem;
+}
+
+#navbar > .navicon_support {
+  flex: 1;
+}
+
+#navbar label.radio {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 56px;
+  cursor: pointer;
 }
 
 .navtitle {
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: small;
-  margin-top: 8px;
-  opacity: 1;
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  margin-top: 6px;
+  color: var(--desc);
+  transition: color var(--dur) var(--ease);
+}
+
+input:checked + .radio .navtitle {
+  color: var(--font);
 }
 
 .navicon {
-  background: var(--small-card);
-  display: flex;
-  width: 0;
-  height: 30px;
-  align-items: center;
-  justify-content: center;
-  border-radius: 50px;
-  animation: closeNav 0.15s;
+  background-color: var(--desktop-navicon);
+  display: block;
+  width: 60px;
+  height: 32px;
+  border-radius: var(--radius-pill);
+  opacity: 0;
+  transform: scaleX(0.35);
+  transition: opacity var(--dur) var(--ease), transform var(--dur) var(--ease);
 }
 
 .navicon.show {
-  width: 65px;
-  animation: openNav 0.15s;
+  opacity: 1;
+  transform: none;
 }
 
 @media ((min-width: 850px) and (orientation: landscape)), (max-width: 350px) {
   #navbar {
-    background-color: var(--desktop-navbar);
-    transform: scale(0.85);
     left: auto;
     right: auto;
-    margin-bottom: 30px;
-    border-radius: 60px;
-    padding: 10px 10px;
+    bottom: 18px;
+    padding: 8px 10px;
+    border: 1px solid var(--outline);
+    border-radius: var(--radius-pill);
+    box-shadow: var(--shadow-2);
+    gap: 4px;
   }
   .navtitle {
     display: none;
   }
+  #navbar label.radio {
+    min-height: 52px;
+    padding: 0 6px;
+  }
   .navicon_support {
-    border-radius: 60px;
+    border-radius: var(--radius-pill);
   }
   #navbar_support_div {
     display: flex;
@@ -103,14 +128,7 @@
     width: 100%;
   }
   .navicon {
-    background: var(--desktop-navicon);
-    height: 65px;
-    animation: closeNavDesktop 0.15s;
-  }
-  .navicon.show {
-    animation: openNavDesktop 0.15s;
-  }
-  .nav_dimc {
-    background: var(--desktop-navbar);
+    width: 52px;
+    height: 44px;
   }
 }

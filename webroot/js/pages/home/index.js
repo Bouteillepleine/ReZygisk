@@ -116,7 +116,7 @@ async function _updateDynamicElement(firstRun, ReZygiskState, strings) {
 
     rzState.expectedWorking++
 
-    zygote_divs[index].style.display = 'block'
+    zygote_divs[index].style.display = ''
 
     switch (Number(zygote[abi])) {
       case 1: {

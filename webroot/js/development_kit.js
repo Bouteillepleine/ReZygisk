@@ -5,7 +5,7 @@ const developmentResponse = {
       {
         "root": "KernelSU",
         "monitor": {
-          "state": "0"
+          "state": 0
         },
         "rezygiskd": {
           "64": {
@@ -42,7 +42,12 @@ const developmentResponse = {
   },
   'module_lister': {
     errno: 0,
-    stdout: 'Really Cool Module\n\nSome ReZygisk Module',
+    stdout: 'Really Cool Module\nSome ReZygisk Module\n',
+    stderr: ''
+  },
+  'tracer_probe': {
+    errno: 0,
+    stdout: '64\n',
     stderr: ''
   },
   '/system/bin/ls /data/adb/modules/rezygisk/webroot/lang': {
@@ -57,8 +62,16 @@ export function getDevelopmentExecResponse(command) {
     return developmentResponse[command]
   }
 
-  if (command.includes('printf % ; if test -f')) {
+  if (command.includes("grep -m1 '^name='")) {
     return developmentResponse['module_lister']
+  }
+
+  if (command.includes('zygisk-ptrace$b')) {
+    return developmentResponse['tracer_probe']
+  }
+
+  if (command.includes('zygisk-ptrace64 ctl') || command.includes('zygisk-ptrace32 ctl')) {
+    return { errno: 0, stdout: '', stderr: '' }
   }
 
   return { errno: -1, stdout: '', stderr: 'Command not found in development response' }

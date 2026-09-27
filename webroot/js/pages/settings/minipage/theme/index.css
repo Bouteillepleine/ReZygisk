@@ -1,5 +1,5 @@
 /* INFO: Code shared with settings page */
 .dimc {
-  background: var(--dim);
+  background-color: transparent;
   word-break: break-word;
 }

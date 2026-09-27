@@ -112,6 +112,10 @@ async function _updateDynamicElement() {
     return
   }
 
+  for (const module of all_modules) {
+    module.bitsUsed.sort((a, b) => Number(b) - Number(a))
+  }
+
   await _resolveModuleNames(all_modules)
 
   const fragment = document.createDocumentFragment()

@@ -1,33 +1,81 @@
 :root {
-  --background: #141414;
-  --font: #fff;
-  --desc: #c9c9c9;
-  --bright: #8d1d19;
-  --dim: #1c1c1c;
-  --dim-brigther: #3d3d3d;
-  --icon: #494949;
-  --icon-bc: #292929;
-  --small-card: var(--icon-bc);
-  --button: var(--background);
-  --button-enabled: #535353;
-  --desktop-navbar: #252525;
-  --desktop-navicon: #3a3a3a;
+  /* INFO: Palette inputs. The theme switcher overrides these on :root at
+             runtime, so everything below is derived from them. */
+  --background: #101014;
+  --font: #ecedf1;
+  --desc: #a6a7b2;
+  --dim: #1a1a21;
+  --dim-brigther: #2b2b36;
+  --icon: #4a4a57;
+  --icon-bc: #23232c;
+  --button: #262630;
+  --button-enabled: #6f7291;
+  --desktop-navbar: #1c1c25;
+  --desktop-navicon: #34343f;
+
+  /* INFO: Derived surfaces */
+  --surface: var(--dim);
+  --surface-high: var(--icon-bc);
+  --surface-highest: var(--dim-brigther);
+  --small-card: var(--surface-high);
+
+  /* INFO: Neutral at low alpha so it reads on both light and dark palettes */
+  --outline: rgba(130, 132, 148, 0.22);
+  --outline-strong: rgba(130, 132, 148, 0.38);
+  --scrim: rgba(0, 0, 0, 0.32);
+
+  --state-ok: #4f7a63;
+  --state-warn: #7d6534;
+  --state-error: #7b4048;
+  --state: var(--state-error);
+  --bright: var(--state);
+
+  --radius-sm: 12px;
+  --radius-md: 18px;
+  --radius-lg: 24px;
+  --radius-pill: 999px;
+
+  --gutter: 16px;
+  --gap: 12px;
+
+  --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.18), 0 1px 3px rgba(0, 0, 0, 0.12);
+  --shadow-2: 0 4px 12px rgba(0, 0, 0, 0.22);
+
+  --ease: cubic-bezier(0.2, 0, 0, 1);
+  --dur-fast: 120ms;
+  --dur: 200ms;
 
   /* Locked Color */
   --lock: #fff;
   --font-family: 'Poppins', sans-serif;
 }
 
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
 * {
-  background-color: var(--background);
+  background-color: transparent;
   color: var(--font);
   font-family: var(--font-family);
   user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+html, body {
+  height: 100%;
+  overflow: hidden;
 }
 
 body {
   margin: 0;
+  display: flex;
+  flex-direction: column;
+  background-color: var(--background);
   overscroll-behavior: none;
+  font-size: 16px;
+  line-height: 1.45;
+  -webkit-font-smoothing: antialiased;
 
   /* INFO: WebUI X insets */
   padding-top: var(--window-inset-top);
@@ -38,6 +86,13 @@ a {
   text-decoration: none !important;
 }
 
+:focus-visible {
+  outline: 2px solid var(--button-enabled);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+/* Layout */
 .header {
   display: flex;
   position: sticky;
@@ -45,26 +100,46 @@ a {
   justify-content: space-between;
   top: 0;
   inset-inline: 0;
-  padding: 30px 20px 30px 20px;
-  font-size: 20px;
+  padding: 28px var(--gutter) 18px;
+  font-size: 1.65rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  background-color: var(--background);
   z-index: 5;
 }
 
 .panel {
   display: block;
-  animation: fade-in 0.2s;
-  margin-bottom: 120px;
+  animation: fade-in var(--dur) var(--ease);
+  padding-bottom: 140px;
 }
 
+.section_label {
+  padding: 22px var(--gutter) 8px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--desc);
+}
+
+/* Surfaces */
 .card {
-  margin: 0 15px 10px 15px;
-  padding: 15px 15px;
-  border-radius: 15px;
-  color: var(--lock);
+  margin: 0 var(--gutter) var(--gap);
+  padding: 16px;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--outline);
+  background-color: var(--surface);
+  color: var(--font);
+  box-shadow: var(--shadow-1);
+}
+
+.surface {
+  background-color: var(--surface);
 }
 
 .content {
-  padding-bottom: 5px;
+  padding-bottom: 4px;
 }
 
 .desc {
@@ -78,45 +153,134 @@ a {
 }
 
 .small_card {
-  background: var(--small-card);
-  border-radius: 15px;
-  padding: 5px 15px 0 15px;
-  margin: 0px 15px 0 15px;
-  padding-bottom: 5px;
+  background-color: var(--surface);
+  border: 1px solid var(--outline);
+  border-radius: var(--radius-lg);
+  padding: 14px 16px;
+  margin: 0 var(--gutter);
   justify-content: space-between;
   display: flex;
   align-items: center;
+  gap: 12px;
+  box-shadow: var(--shadow-1);
 }
 
 .small_card_bg {
-  background-color: var(--small-card);
+  background-color: transparent;
 }
 
-/* Card type */
+/* INFO: Kept for markup that still tags its own background */
 .bright {
-  border: 5px solid var(--bright);
-  background: var(--bright);
+  border: 1px solid var(--outline);
+  background-color: var(--state);
 }
 
 .brightc {
-  background: var(--bright);
+  background-color: transparent;
   word-break: break-word;
 }
 
 .dim {
-  border: 5px solid var(--dim);
-  background: var(--dim);
+  border: 1px solid var(--outline);
+  background-color: var(--surface);
 }
 
 .dimc {
-  background: var(--dim);
+  background-color: transparent;
   word-break: break-word;
+}
+
+/* Rows */
+.row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 9px 0;
+}
+
+.row + .row {
+  border-top: 1px solid var(--outline);
+}
+
+.row_label {
+  font-size: 0.98rem;
+  font-weight: 500;
+}
+
+.row_value {
+  color: var(--desc);
+  font-size: 0.88rem;
+  text-align: right;
+  word-break: break-word;
+  max-width: 62%;
+}
+
+/* Chips */
+.chip_row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 10px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--outline-strong);
+  background-color: var(--surface-high);
+  color: var(--desc);
+  font-size: 0.74rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+
+/* Buttons */
+.button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 48px;
+  padding: 0 20px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--outline);
+  background-color: var(--surface-high);
+  font-size: 0.97rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform var(--dur-fast) var(--ease), background-color var(--dur-fast) var(--ease);
+}
+
+.button:active {
+  transform: scale(0.96);
+  background-color: var(--surface-highest);
+}
+
+.card_animation {
+  transition: transform var(--dur-fast) var(--ease), background-color var(--dur-fast) var(--ease);
+  cursor: pointer;
+}
+
+.card_animation:active {
+  transform: scale(0.98);
+  background-color: var(--surface-high);
+}
+
+/* Skeleton */
+.skeleton {
+  border-radius: 8px;
+  background: linear-gradient(90deg, var(--surface-high) 25%, var(--surface-highest) 37%, var(--surface-high) 63%);
+  background-size: 400% 100%;
+  animation: skeleton 1.2s ease-in-out infinite;
+  color: transparent !important;
 }
 
 /* Animation KeyFrames */
 @keyframes fade-in {
-  from { opacity: 0; }
-  to { opacity: 1; }
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: none; }
 }
 
 @keyframes fade-out {
@@ -129,38 +293,9 @@ a {
   to { transform: rotate(360deg); }
 }
 
-@keyframes closeNav {
-  0% { width: 100%; }
-  100% { width: 0%; }
-}
-
-@keyframes openNav {
-  0% { width: 0%; }
-  100% { width: 100%; }
-}
-
-@keyframes closeNavDesktop {
-  0% { transform: scale(1); opacity: 1; }
-  100% { transform: scale(0); opacity: 0; }
-}
-
-@keyframes openNavDesktop {
-  0% { transform: scale(0); opacity: 0; }
-  100% { transform: scale(1); opacity: 1; }
-}
-
-*, *::before, *::after {
-  box-sizing: border-box;
-}
-
-html, body {
-  height: 100%;
-  overflow: hidden;
-}
-
-body {
-  display: flex;
-  flex-direction: column;
+@keyframes skeleton {
+  from { background-position: 100% 50%; }
+  to { background-position: 0 50%; }
 }
 
 #page_content {
@@ -168,6 +303,11 @@ body {
   flex: 1;
   overflow-y: auto;
   overflow-x: hidden;
+  scrollbar-width: none;
+}
+
+#page_content::-webkit-scrollbar {
+  display: none;
 }
 
 .page_loader_main_viewport_transition {
@@ -255,3 +395,17 @@ body {
   }
 }
 
+@media (min-width: 720px) {
+  .panel {
+    max-width: 680px;
+    margin: 0 auto;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

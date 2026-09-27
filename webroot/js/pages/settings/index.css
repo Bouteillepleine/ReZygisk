@@ -1,85 +1,118 @@
-
-
 .card_animation {
-  transition: transform 0.05s ease-in-out;
+  transition: transform var(--dur-fast) var(--ease), background-color var(--dur-fast) var(--ease);
+  cursor: pointer;
 }
 
 .card_animation:active {
-  transform: scale(96%);
+  transform: scale(0.98);
+  background-color: var(--surface-high);
 }
 
 .language_card {
-  background-color: var(--dim-brigther);
-  font-size: 1.2em;
-  padding: 15px;
-  padding-left: 20px;
-  border-radius: 10px;
+  background-color: var(--surface-high);
+  border: 1px solid var(--outline);
+  font-size: 1.02rem;
+  min-height: 52px;
+  display: flex;
+  align-items: center;
+  padding: 12px 18px;
+  border-radius: var(--radius-md);
   cursor: pointer;
+  transition: background-color var(--dur-fast) var(--ease);
+}
+
+.language_card:active {
+  background-color: var(--surface-highest);
 }
 
 /* INFO: Code shared with actions page */
-.slider {
-  position: absolute;
-  inset: 0;
-  cursor: pointer;
-  background-color: var(--button);
-  transition: 0.4s;
-  border-radius: 34px;
-  border: 2px solid var(--desc);
-  /* border: 2px solid var(--button); */
-}
-
-.slider:before {
-  position: absolute;
-  content: "";
-  height: 23px;
-  width: 23px;
-  left: 4px;
-  bottom: 4px;
-  transition: 0.4s;
-  background-color: var(--desc);
-  border-radius: 50%;
-  transform: scale(0.8);
-}
-
-input:checked + .slider:before {
-  transform: translateX(26px) scale(1);
-}
-
-input:checked + .slider {
-  background-color: var(--button-enabled);
-  transition: 0.6s;
-}
-
-.action_card {
-  display: inline-block;
-  width: 80%;
-  transition: opacity 0.5s;
-}
-
-.action_card_title {
-  font-size: 1.1em;
-  padding-left: 5px;
-  padding-top: 6px;
-  padding-bottom: 2px;
-}
-
-.action_card_description {
-  font-size: 0.9em;
-  padding-left: 5px;
-  padding-bottom: 6px;
-}
-
 .switch {
   position: relative;
   display: inline-block;
-  width: 60px;
-  height: 34px;
-  margin-left: 10px;
+  flex: 0 0 auto;
+  width: 52px;
+  height: 32px;
 }
 
 .switch input {
   opacity: 0;
   width: 0;
   height: 0;
+}
+
+.slider {
+  position: absolute;
+  inset: 0;
+  cursor: pointer;
+  background-color: var(--surface-high);
+  transition: background-color var(--dur) var(--ease), border-color var(--dur) var(--ease);
+  border-radius: var(--radius-pill);
+  border: 2px solid var(--outline-strong);
+}
+
+.slider:before {
+  position: absolute;
+  content: "";
+  height: 20px;
+  width: 20px;
+  left: 4px;
+  top: 4px;
+  transition: transform var(--dur) var(--ease), background-color var(--dur) var(--ease);
+  background-color: var(--desc);
+  border-radius: 50%;
+  transform: scale(0.8);
+}
+
+input:checked + .slider {
+  background-color: var(--button-enabled);
+  border-color: transparent;
+}
+
+input:checked + .slider:before {
+  transform: translateX(20px) scale(1);
+  background-color: var(--lock);
+}
+
+.action_card {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.action_card_title {
+  font-size: 1rem;
+  font-weight: 500;
+}
+
+.action_card_description {
+  font-size: 0.85rem;
+  color: var(--desc);
+}
+
+.credit_group + .credit_group {
+  margin-top: 14px;
+}
+
+.credit_title {
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--desc);
+  margin-bottom: 4px;
+}
+
+.credit_people {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 6px;
+  font-size: 0.95rem;
+}
+
+.credit_link {
+  color: var(--font);
+  cursor: pointer;
+  border-bottom: 1px solid var(--outline-strong);
 }
