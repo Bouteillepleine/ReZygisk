@@ -1,6 +1,8 @@
-name: Untrusted CI
+name: CI
 
 on:
+  push:
+    branches: [ '**' ]
   pull_request:
   merge_group:
   workflow_dispatch:
@@ -8,9 +10,52 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
-  build:
+  lint:
+    name: Lint
     runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - name: Installer scripts parse
+        run: |
+          for script in module/src/*.sh module/src/META-INF/com/google/android/update-binary; do
+            echo "checking $script"
+            bash -n "$script"
+          done
+
+      - name: WebUI modules parse as ESM
+        run: |
+          mkdir -p /tmp/jscheck
+          find webroot/js -name '*.js' -print0 | while IFS= read -r -d '' file; do
+            cp "$file" "/tmp/jscheck/$(echo "$file" | tr '/' '_').mjs"
+          done
+          for file in /tmp/jscheck/*.mjs; do
+            echo "checking $file"
+            node --check "$file"
+          done
+
+      - name: Language files are valid JSON
+        run: |
+          for file in webroot/lang/*.json; do
+            echo "checking $file"
+            node -e "JSON.parse(require('fs').readFileSync(process.argv[1], 'utf8'))" "$file"
+          done
+
+  build:
+    name: Build ${{ matrix.type }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        type: [ debug, release ]
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -20,20 +65,15 @@ jobs:
           persist-credentials: false
 
       - name: Setup NDK_PATH
-        run: echo "NDK_PATH=$ANDROID_NDK_LATEST_HOME" >> $GITHUB_ENV
+        run: echo "NDK_PATH=$ANDROID_NDK_LATEST_HOME" >> "$GITHUB_ENV"
 
       - name: Build
-        run: |
-          make all -j$(nproc)
+        run: make ${{ matrix.type }} -j"$(nproc)"
 
-      - name: Upload release
+      - name: Upload ${{ matrix.type }}
         uses: actions/upload-artifact@v7
         with:
-          path: "build/out/ReZygisk-v*-release.zip"
+          name: ReZygisk-${{ matrix.type }}
+          path: "build/out/ReZygisk-v*-${{ matrix.type }}.zip"
           archive: false
-
-      - name: Upload debug
-        uses: actions/upload-artifact@v7
-        with:
-          path: "build/out/ReZygisk-v*-debug.zip"
-          archive: false
+          if-no-files-found: error
