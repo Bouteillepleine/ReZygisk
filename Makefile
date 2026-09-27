@@ -101,6 +101,21 @@ $(MODULE_DONE): $(LOADER_DONE) $(ZYGISKD_DONE) $(MODULE_INPUTS)
 	@echo "Copying webroot..."
 	@cp -r webroot $(MODULE_OUT)/webroot
 
+	@echo "Checking line endings..."
+	@cr=$$(printf '\r');                                                                  \
+	bad="";                                                                               \
+	for file in $(MODULE_OUT)/*.sh $(MODULE_OUT)/module.prop $(MODULE_OUT)/sepolicy.rule  \
+	            $(MODULE_OUT)/META-INF/com/google/android/*; do                           \
+		[ -f "$$file" ] || continue;                                                      \
+		if grep -qI "$$cr" "$$file" 2>/dev/null; then bad="$$bad $$file"; fi;              \
+	done;                                                                                 \
+	if [ -n "$$bad" ]; then                                                               \
+		echo "ERROR: CRLF line endings in files the device executes:";                    \
+		for file in $$bad; do echo "  $$file"; done;                                      \
+		echo "The installer runs these with sh; CRLF makes it fail on-device.";           \
+		exit 1;                                                                           \
+	fi
+
 	@if [ -f module/private_key ]; then                                             \
 		echo "Signing module...";                                                   \
 		python3 scripts/sign.py $(MODULE_OUT) module/private_key module/public_key; \
