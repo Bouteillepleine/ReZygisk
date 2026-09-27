@@ -69,8 +69,8 @@ void *entry_thread(void *arg) {
              if the module companion already closed the fd.
   */
   struct stat st1;
-  if (fstat(fd, &st1) != -1 && st0.st_ino == st1.st_ino) {
-    LOGI(" - Client fd changed after module entry");
+  if (fstat(fd, &st1) != -1 && st0.st_ino == st1.st_ino && st0.st_dev == st1.st_dev) {
+    LOGI(" - Closing client fd still held after module entry");
 
     close(fd);
   }
@@ -82,6 +82,9 @@ void *entry_thread(void *arg) {
 
 /* WARNING: Dynamic memory based */
 void companion_entry(int fd) {
+  struct sigaction ignore_sigpipe = { .sa_handler = SIG_IGN };
+  sigaction(SIGPIPE, &ignore_sigpipe, NULL);
+
   LOGI("New companion entry.\n - Client fd: %d\n", fd);
 
   char name[256 + 1];
@@ -119,9 +122,6 @@ void companion_entry(int fd) {
     ret = write_uint8_t(fd, 1);
     ASSURE_SIZE_WRITE("ZygiskdCompanion", "module_entry", ret, sizeof(uint8_t), goto cleanup);
   }
-
-  struct sigaction sa = { .sa_handler = SIG_IGN };
-  sigaction(SIGPIPE, &sa, NULL);
 
   while (1) {
     if (!check_unix_socket(fd, true)) {

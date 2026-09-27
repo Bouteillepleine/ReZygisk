@@ -87,6 +87,8 @@ void set_socket_create_context(const char *restrict context) {
     if (fwrite(context, 1, strlen(context), sockcreate) != strlen(context)) {
       LOGE("Failed to write to tid sockcreate with %d: %s", errno, strerror(errno));
 
+      fclose(sockcreate);
+
       return;
     }
 
@@ -101,7 +103,7 @@ static bool get_current_attr(char *restrict output, size_t size) {
     return false;
   }
 
-  size_t ret = fread(output, 1, size, current);
+  size_t ret = fread(output, 1, size - 1, current);
   if (ferror(current)) {
     LOGE("fread: %s", strerror(errno));
 
@@ -177,7 +179,7 @@ int unix_listener_from_path(const char *restrict path) {
     return -1;
   }
 
-  int socket_fd = socket(AF_UNIX, SOCK_STREAM, 0);
+  int socket_fd = socket(AF_UNIX, SOCK_STREAM | SOCK_CLOEXEC, 0);
   if (socket_fd == -1) {
     LOGE("socket: %s", strerror(errno));
 
@@ -197,7 +199,7 @@ int unix_listener_from_path(const char *restrict path) {
     return -1;
   }
 
-  if (listen(socket_fd, 2) == -1) {
+  if (listen(socket_fd, 32) == -1) {
     LOGE("listen: %s", strerror(errno));
 
     close(socket_fd);
@@ -306,16 +308,50 @@ read_func(uint32_t)
 write_func(uint8_t)
 read_func(uint8_t)
 
+static ssize_t write_full(int fd, const void *restrict buf, size_t count) {
+  size_t written = 0;
+  while (written < count) {
+    ssize_t ret = write(fd, (const char *)buf + written, count - written);
+    if (ret == -1) {
+      if (errno == EINTR) continue;
+
+      return -1;
+    }
+    if (ret == 0) break;
+
+    written += (size_t)ret;
+  }
+
+  return (ssize_t)written;
+}
+
+static ssize_t read_full(int fd, void *restrict buf, size_t count) {
+  size_t got = 0;
+  while (got < count) {
+    ssize_t ret = read(fd, (char *)buf + got, count - got);
+    if (ret == -1) {
+      if (errno == EINTR) continue;
+
+      return -1;
+    }
+    if (ret == 0) break;
+
+    got += (size_t)ret;
+  }
+
+  return (ssize_t)got;
+}
+
 ssize_t write_string(int fd, const char *restrict str) {
   size_t str_len = strlen(str);
-  ssize_t written_bytes = write(fd, &str_len, sizeof(size_t));
-  if (written_bytes != sizeof(size_t)) {
+  ssize_t written_bytes = write_full(fd, &str_len, sizeof(size_t));
+  if (written_bytes != (ssize_t)sizeof(size_t)) {
     LOGE("Failed to write string length: Not all bytes were written (%zd != %zu).", written_bytes, sizeof(size_t));
 
     return -1;
   }
 
-  written_bytes = write(fd, str, str_len);
+  written_bytes = write_full(fd, str, str_len);
   if ((size_t)written_bytes != str_len) {
     LOGE("Failed to write string: Not all bytes were written.");
 
@@ -326,8 +362,12 @@ ssize_t write_string(int fd, const char *restrict str) {
 }
 
 ssize_t read_string(int fd, char *restrict buf, size_t buf_size) {
+  if (buf_size == 0) return -1;
+
+  buf[0] = '\0';
+
   size_t str_len = 0;
-  ssize_t read_bytes = read(fd, &str_len, sizeof(size_t));
+  ssize_t read_bytes = read_full(fd, &str_len, sizeof(size_t));
   if (read_bytes != (ssize_t)sizeof(size_t)) {
     LOGE("Failed to read string length: Not all bytes were read (%zd != %zu).", read_bytes, sizeof(size_t));
 
@@ -340,16 +380,30 @@ ssize_t read_string(int fd, char *restrict buf, size_t buf_size) {
     return -1;
   }
 
-  read_bytes = read(fd, buf, str_len);
+  read_bytes = read_full(fd, buf, str_len);
   if (read_bytes != (ssize_t)str_len) {
     LOGE("Failed to read string: Promised bytes doesn't exist (%zd != %zu).", read_bytes, str_len);
 
     return -1;
   }
 
-  if (str_len > 0) buf[str_len] = '\0';
+  buf[str_len] = '\0';
 
   return read_bytes;
+}
+
+bool is_valid_process_name(const char *restrict process) {
+  if (process[0] == '\0') return false;
+
+  for (const char *c = process; *c != '\0'; c++) {
+    bool ok = (*c >= 'a' && *c <= 'z') || (*c >= 'A' && *c <= 'Z') ||
+              (*c >= '0' && *c <= '9') ||
+              *c == '.' || *c == '_' || *c == '-' || *c == ':';
+
+    if (!ok) return false;
+  }
+
+  return true;
 }
 
 /* INFO: Cannot use restrict here as execv does not have restrict */
@@ -387,14 +441,38 @@ bool exec_command(char *restrict buf, size_t len, const char *restrict file, con
   } else {
     close(link[1]);
 
-    ssize_t nbytes = read(link[0], buf, len);
-    if (nbytes > 0) buf[nbytes - 1] = '\0';
-    /* INFO: If something went wrong, at least we must ensure it is NULL-terminated */
-    else buf[0] = '\0';
+    buf[0] = '\0';
 
-    wait(NULL);
+    size_t total = 0;
+    while (total < len - 1) {
+      ssize_t nbytes = read(link[0], buf + total, len - 1 - total);
+      if (nbytes == -1) {
+        if (errno == EINTR) continue;
+
+        break;
+      }
+      if (nbytes == 0) break;
+
+      total += (size_t)nbytes;
+    }
+
+    if (total > 0 && buf[total - 1] == '\n') total--;
+    buf[total] = '\0';
 
     close(link[0]);
+
+    int status = 0;
+    if (waitpid(pid, &status, 0) == -1) {
+      LOGE("waitpid: %s", strerror(errno));
+
+      return false;
+    }
+
+    if (!WIFEXITED(status) || WEXITSTATUS(status) != 0) {
+      LOGE("Command \"%s\" failed with status %d", file, status);
+
+      return false;
+    }
   }
 
   return true;
@@ -507,7 +585,7 @@ struct mountinfos {
   size_t length;
 };
 
-char *strndup(const char *restrict str, size_t length) {
+static char *rz_strndup(const char *restrict str, size_t length) {
   char *restrict copy = malloc(length + 1);
   if (copy == NULL) return NULL;
 
@@ -598,19 +676,19 @@ bool parse_mountinfo(const char *restrict pid, struct mountinfos *restrict mount
     mounts->mounts[i].id = id;
     mounts->mounts[i].parent = parent;
     mounts->mounts[i].device = (dev_t)(makedev(maj, min));
-    mounts->mounts[i].root = strndup(line + root_start, (size_t)(root_end - root_start));
+    mounts->mounts[i].root = rz_strndup(line + root_start, (size_t)(root_end - root_start));
     if (mounts->mounts[i].root == NULL) {
       LOGE("Failed to allocate memory for root");
 
       goto cleanup_mount_allocs;
     }
-    mounts->mounts[i].target = strndup(line + target_start, (size_t)(target_end - target_start));
+    mounts->mounts[i].target = rz_strndup(line + target_start, (size_t)(target_end - target_start));
     if (mounts->mounts[i].target == NULL) {
       LOGE("Failed to allocate memory for target");
 
       goto cleanup_root;
     }
-    mounts->mounts[i].vfs_option = strndup(line + vfs_option_start, (size_t)(vfs_option_end - vfs_option_start));
+    mounts->mounts[i].vfs_option = rz_strndup(line + vfs_option_start, (size_t)(vfs_option_end - vfs_option_start));
     if (mounts->mounts[i].vfs_option == NULL) {
       LOGE("Failed to allocate memory for vfs_option");
 
@@ -619,19 +697,19 @@ bool parse_mountinfo(const char *restrict pid, struct mountinfos *restrict mount
     mounts->mounts[i].optional.shared = shared;
     mounts->mounts[i].optional.master = master;
     mounts->mounts[i].optional.propagate_from = propagate_from;
-    mounts->mounts[i].type = strndup(line + type_start, (size_t)(type_end - type_start));
+    mounts->mounts[i].type = rz_strndup(line + type_start, (size_t)(type_end - type_start));
     if (mounts->mounts[i].type == NULL) {
       LOGE("Failed to allocate memory for type");
 
       goto cleanup_vfs_option;
     }
-    mounts->mounts[i].source = strndup(line + source_start, (size_t)(source_end - source_start));
+    mounts->mounts[i].source = rz_strndup(line + source_start, (size_t)(source_end - source_start));
     if (mounts->mounts[i].source == NULL) {
       LOGE("Failed to allocate memory for source");
 
       goto cleanup_type;
     }
-    mounts->mounts[i].fs_option = strndup(line + fs_option_start, (size_t)(fs_option_end - fs_option_start));
+    mounts->mounts[i].fs_option = rz_strndup(line + fs_option_start, (size_t)(fs_option_end - fs_option_start));
     if (mounts->mounts[i].fs_option == NULL) {
       LOGE("Failed to allocate memory for fs_option");
 
@@ -733,15 +811,27 @@ bool umount_root(struct root_impl impl) {
   return true;
 }
 
-int save_mns_fd(int pid, enum MountNamespaceState mns_state, struct root_impl impl) {
-  static int clean_namespace_fd = -1;
-  static int mounted_namespace_fd = -1;
+static int clean_namespace_fd = -1;
+static int mounted_namespace_fd = -1;
 
+void reset_mns_cache(void) {
+  if (clean_namespace_fd != -1) {
+    close(clean_namespace_fd);
+    clean_namespace_fd = -1;
+  }
+
+  if (mounted_namespace_fd != -1) {
+    close(mounted_namespace_fd);
+    mounted_namespace_fd = -1;
+  }
+}
+
+int save_mns_fd(int pid, enum MountNamespaceState mns_state, struct root_impl impl) {
   if (mns_state == Clean && clean_namespace_fd != -1) return clean_namespace_fd;
   if (mns_state == Mounted && mounted_namespace_fd != -1) return mounted_namespace_fd;
 
   int sockets[2];
-  if (socketpair(AF_UNIX, SOCK_STREAM, 0, sockets) == -1) {
+  if (socketpair(AF_UNIX, SOCK_STREAM | SOCK_CLOEXEC, 0, sockets) == -1) {
     LOGE("socketpair: %s", strerror(errno));
 
     return -1;
@@ -825,7 +915,7 @@ int save_mns_fd(int pid, enum MountNamespaceState mns_state, struct root_impl im
   char ns_path[PATH_MAX];
   snprintf(ns_path, PATH_MAX, "/proc/%d/ns/mnt", fork_pid);
 
-  int ns_fd = open(ns_path, O_RDONLY);
+  int ns_fd = open(ns_path, O_RDONLY | O_CLOEXEC);
   if (ns_fd == -1) {
     LOGE("open: %s", strerror(errno));
 

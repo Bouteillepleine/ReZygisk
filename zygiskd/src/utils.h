@@ -22,17 +22,23 @@
   #define LOG_TAG "zygiskd" LP_SELECT("32", "64")
 #endif
 
-#define LOGI(...)                                              \
-  __android_log_print(ANDROID_LOG_INFO, LOG_TAG, __VA_ARGS__); \
-  printf(__VA_ARGS__)
+#define LOGI(...)                                                  \
+  do {                                                             \
+    __android_log_print(ANDROID_LOG_INFO, LOG_TAG, __VA_ARGS__);   \
+    printf(__VA_ARGS__);                                           \
+  } while (0)
 
-#define LOGW(...)                                                \
-  __android_log_print(ANDROID_LOG_WARN, LOG_TAG, __VA_ARGS__);   \
-  printf(__VA_ARGS__)
+#define LOGW(...)                                                  \
+  do {                                                             \
+    __android_log_print(ANDROID_LOG_WARN, LOG_TAG, __VA_ARGS__);   \
+    printf(__VA_ARGS__);                                           \
+  } while (0)
 
-#define LOGE(...)                                                \
-  __android_log_print(ANDROID_LOG_ERROR , LOG_TAG, __VA_ARGS__); \
-  printf(__VA_ARGS__)
+#define LOGE(...)                                                  \
+  do {                                                             \
+    __android_log_print(ANDROID_LOG_ERROR, LOG_TAG, __VA_ARGS__);  \
+    printf(__VA_ARGS__);                                           \
+  } while (0)
 
 #define ASSURE_SIZE_WRITE(area_name, subarea_name, sent_size, expected_size, return_type)                        \
   if (sent_size != (ssize_t)(expected_size)) {                                                                   \
@@ -48,7 +54,7 @@
     return_type;                                                                                                 \
   }
 
-#define APP_ID(uid) uid % 100000
+#define APP_ID(uid) ((uid) % 100000)
 
 #define IS_ISOLATED_SERVICE(uid)      \
   ((APP_ID(uid)) >= 90000)
@@ -96,5 +102,9 @@ int non_blocking_execv(const char *restrict file, char *const argv[]);
 void stringify_root_impl_name(struct root_impl impl, char *restrict output);
 
 int save_mns_fd(int pid, enum MountNamespaceState mns_state, struct root_impl impl);
+
+void reset_mns_cache(void);
+
+bool is_valid_process_name(const char *restrict process);
 
 #endif /* UTILS_H */

@@ -164,7 +164,7 @@ static int create_daemon_socket(void) {
 
 static int spawn_companion(char *restrict argv[], char *restrict name, int lib_fd) {
   int sockets[2];
-  if (socketpair(AF_UNIX, SOCK_STREAM, 0, sockets) == -1) {
+  if (socketpair(AF_UNIX, SOCK_STREAM | SOCK_CLOEXEC, 0, sockets) == -1) {
     LOGE("Failed creating socket pair.");
 
     return -1;
@@ -370,6 +370,8 @@ void zygiskd_start(char *restrict argv[]) {
   while (1) {
     int client_fd = accept(socket_fd, NULL, NULL);
     if (client_fd == -1) {
+      if (errno == EINTR || errno == ECONNABORTED) continue;
+
       LOGE("accept: %s", strerror(errno));
 
       break;
@@ -382,13 +384,13 @@ void zygiskd_start(char *restrict argv[]) {
 
       close(client_fd);
 
-      break;
+      continue;
     } else if (len == 0) {
       LOGI("Client disconnected");
 
       close(client_fd);
 
-      break;
+      continue;
     }
 
     enum DaemonSocketAction action = (enum DaemonSocketAction)action8;
@@ -411,6 +413,8 @@ void zygiskd_start(char *restrict argv[]) {
           context.modules[i].companion = -1;
         }
 
+        reset_mns_cache();
+
         break;
       }
       case GetProcessFlags: {
@@ -425,6 +429,12 @@ void zygiskd_start(char *restrict argv[]) {
           LOGE("Failed reading process name.");
 
           break;
+        }
+
+        if (process[0] != '\0' && !is_valid_process_name(process)) {
+          LOGE("Rejected malformed process name.");
+
+          process[0] = '\0';
         }
 
         uint32_t flags = 0;

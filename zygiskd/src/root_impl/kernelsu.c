@@ -1,6 +1,7 @@
 #include <string.h>
 #include <errno.h>
 
+#include <fcntl.h>
 #include <unistd.h>
 #include <sys/ioctl.h>
 #include <sys/prctl.h>
@@ -141,6 +142,9 @@ void ksu_get_existence(struct root_impl_state *state) {
 
   ksu_uses_new_ksuctl = true;
 
+  if (fcntl(ksu_fd, F_SETFD, FD_CLOEXEC) == -1)
+    LOGW("Failed setting FD_CLOEXEC on the KernelSU control fd: %s\n", strerror(errno));
+
   struct ksu_set_feature_cmd cmd = {
     .feature_id = 1, /* INFO: kernel_umount */
     .value = 0
@@ -239,7 +243,7 @@ bool ksu_uid_is_manager(uid_t uid) {
   }
 
   /* INFO: If it uses ioctl, it already has support to get manager UID operation */
-  struct ksu_get_manager_uid_cmd cmd;
+  struct ksu_get_manager_uid_cmd cmd = { 0 };
   if (ioctl(ksu_fd, KSU_IOCTL_GET_MANAGER_UID, &cmd) == -1) {
     LOGE("Failed to ioctl KSU_IOCTL_GET_MANAGER_UID: %s\n", strerror(errno));
 
@@ -251,8 +255,18 @@ bool ksu_uid_is_manager(uid_t uid) {
 }
 
 void ksu_cleanup(void) {
-  if (ksu_fd != -1) {
-    close(ksu_fd);
-    ksu_fd = -1;
+  if (ksu_fd == -1) return;
+
+  if (ksu_uses_new_ksuctl) {
+    struct ksu_set_feature_cmd cmd = {
+      .feature_id = 1, /* INFO: kernel_umount */
+      .value = 1
+    };
+
+    if (ioctl(ksu_fd, KSU_IOCTL_SET_FEATURE, &cmd) == -1)
+      LOGW("Failed restoring kernel_umount: %s\n", strerror(errno));
   }
+
+  close(ksu_fd);
+  ksu_fd = -1;
 }

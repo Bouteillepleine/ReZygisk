@@ -37,10 +37,18 @@ void apatch_get_existence(struct root_impl_state *state) {
   char apatch_version[32];
   const char *const argv[] = { "apd", "-V", NULL };
 
-  if (!exec_command(apatch_version, sizeof(apatch_version), "/data/adb/apd", argv)) {
+  if (!exec_command(apatch_version, sizeof(apatch_version), "/data/adb/ap/bin/apd", argv)) {
     LOGE("Failed to execute apd binary: %s", strerror(errno));
 
     state->state = Inexistent;
+
+    return;
+  }
+
+  if (strncmp(apatch_version, "apd ", strlen("apd ")) != 0) {
+    LOGE("Unexpected apd -V output.");
+
+    state->state = Abnormal;
 
     return;
   }
@@ -186,9 +194,8 @@ bool apatch_uid_should_umount(uid_t uid, const char *const process) {
 
     for (size_t i = 0; i < config.size; i++) {
       size_t config_process_length = strlen(config.configs[i].process);
-      size_t smallest_process_length = targeted_process_length < config_process_length ? targeted_process_length : config_process_length;
-
-      if (strncmp(config.configs[i].process, process, smallest_process_length) != 0) continue;
+      if (config_process_length > targeted_process_length) continue;
+      if (strncmp(config.configs[i].process, process, config_process_length) != 0) continue;
 
       /* INFO: This allow us to copy the information to avoid use-after-free */
       bool umount_needed = config.configs[i].umount_needed;

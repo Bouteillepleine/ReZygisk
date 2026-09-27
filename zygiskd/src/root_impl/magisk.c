@@ -99,7 +99,7 @@ bool magisk_uid_is_manager(uid_t uid) {
   }
 
   char pkg[NAME_MAX + 1] = "com.topjohnwu.magisk";
-  if (output[0] != '\0')
+  if (strncmp(output, "value=", strlen("value=")) == 0 && output[strlen("value=")] != '\0')
     snprintf(pkg, sizeof(pkg), "%s", output + strlen("value="));
 
   uid_t manager_uid = uid_from_pkg(pkg);
