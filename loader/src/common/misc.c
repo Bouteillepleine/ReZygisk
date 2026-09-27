@@ -126,6 +126,8 @@ struct maps_info *parse_maps_safe(const char *pid) {
 
     close(sockets[0]);
 
+    waitpid(ppid, NULL, 0);
+
     return NULL;
   }
 
@@ -136,6 +138,8 @@ struct maps_info *parse_maps_safe(const char *pid) {
     close(fd);
     close(sockets[0]);
 
+    waitpid(ppid, NULL, 0);
+
     return NULL;
   }
 
@@ -145,8 +149,9 @@ struct maps_info *parse_maps_safe(const char *pid) {
 
     fclose(fp);
 
-    close(fd);
     close(sockets[0]);
+
+    waitpid(ppid, NULL, 0);
 
     return NULL;
   }
@@ -158,8 +163,11 @@ struct maps_info *parse_maps_safe(const char *pid) {
 
     free(info_array);
 
-    close(fd);
+    fclose(fp);
+
     close(sockets[0]);
+
+    waitpid(ppid, NULL, 0);
 
     return NULL;
   }
@@ -167,7 +175,8 @@ struct maps_info *parse_maps_safe(const char *pid) {
 
   char line[1024];
   while (fgets(line, sizeof(line), fp) != NULL) {
-    line[strlen(line) - 1] = '\0';
+    size_t line_len = strlen(line);
+    if (line_len > 0 && line[line_len - 1] == '\n') line[line_len - 1] = '\0';
 
     uintptr_t start, end, offset;
     unsigned int dev_major, dev_minor;
@@ -245,7 +254,13 @@ struct maps_info *parse_maps_safe(const char *pid) {
   if (TEMP_FAILURE_RETRY(write(sockets[0], &can_kill_itself, sizeof(can_kill_itself))) < 0) {
     LOGE("Failed to write to socket");
 
-    goto cleanup_maps;
+    close(sockets[0]);
+
+    free_maps(info_array);
+
+    waitpid(ppid, NULL, 0);
+
+    return NULL;
   }
 
   close(sockets[0]);
@@ -253,7 +268,7 @@ struct maps_info *parse_maps_safe(const char *pid) {
   if (info_array->length == 0) {
     LOGE("Failed to find any maps in %s", pid);
 
-    free(info_array);
+    free_maps(info_array);
 
     waitpid(ppid, NULL, 0);
 
@@ -314,7 +329,8 @@ struct maps_info *parse_maps(const char *pid) {
 
   char line[1024];
   while (fgets(line, sizeof(line), fp) != NULL) {
-    line[strlen(line) - 1] = '\0';
+    size_t line_len = strlen(line);
+    if (line_len > 0 && line[line_len - 1] == '\n') line[line_len - 1] = '\0';
 
     uintptr_t start, end, offset;
     unsigned int dev_major, dev_minor;
@@ -387,7 +403,7 @@ struct maps_info *parse_maps(const char *pid) {
   if (info_array->length == 0) {
     LOGE("Failed to find any maps in %s", pid);
 
-    free(info_array);
+    free_maps(info_array);
 
     return NULL;
   }

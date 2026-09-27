@@ -18,6 +18,9 @@
 
 #define SOCKET_NAME "init_monitor"
 
+#define MAX_CONTROL_STRING 4096
+#define MAX_CONTROL_MODULES 512
+
 #define STOPPED_WITH(sig, event) (WIFSTOPPED(sigchld_status) && (sigchld_status >> 8 == ((sig) | ((event) << 8))))
 
 static bool update_status(const char *message);
@@ -116,7 +119,7 @@ void monitor_events_loop() {
 
     for (int i = 0; i < nfds; i++) {
       if (events[i].events & (EPOLLERR | EPOLLHUP)) {
-        LOGE("Failed event on fd %d: %s", ((struct epoll_event *)&events[i])->data.fd, strerror(errno));
+        LOGE("Failed event (0x%x) on a monitored fd", events[i].events);
 
         monitor_events_running = false;
 
@@ -148,11 +151,22 @@ bool rezygiskd_listener_init() {
     .sun_path = { 0 }
   };
 
-  size_t sun_path_len = sprintf(addr.sun_path, "%s/%s", rezygiskd_get_path(), SOCKET_NAME);
+  int sun_path_len = snprintf(addr.sun_path, sizeof(addr.sun_path), "%s/%s", rezygiskd_get_path(), SOCKET_NAME);
+  if (sun_path_len < 0 || (size_t)sun_path_len >= sizeof(addr.sun_path)) {
+    LOGE("monitor socket path does not fit");
 
-  socklen_t socklen = sizeof(sa_family_t) + sun_path_len;
+    close(monitor_sock_fd);
+    monitor_sock_fd = -1;
+
+    return false;
+  }
+
+  socklen_t socklen = sizeof(sa_family_t) + (socklen_t)sun_path_len;
   if (bind(monitor_sock_fd, (struct sockaddr *)&addr, socklen) == -1) {
     PLOGE("bind socket");
+
+    close(monitor_sock_fd);
+    monitor_sock_fd = -1;
 
     return false;
   }
@@ -311,6 +325,16 @@ void rezygiskd_listener_callback() {
         }
 
         LOGD("%s root impl: %s", daemon_name, environment_information->root_impl);
+
+        if (environment_information->modules_len > MAX_CONTROL_MODULES) {
+          LOGE("Refusing implausible module count %u", environment_information->modules_len);
+
+          free((void *)environment_information->root_impl);
+          environment_information->root_impl = NULL;
+          environment_information->modules_len = 0;
+
+          break;
+        }
 
         if (environment_information->modules) {
           LOGD("freeing old %s modules", daemon_name);
@@ -483,6 +507,7 @@ static bool ensure_daemon_created(bool is_64bit) {
                                                                   \
     LOGW("daemon" #abi " pid %d exited: %s", pid, status_str);    \
     status##abi.daemon_running = false;                           \
+    status##abi.daemon_pid = -1;                                  \
                                                                   \
     if (!status##abi.daemon_error_info) {                         \
       status##abi.daemon_error_info = strdup(status_str);         \
@@ -628,8 +653,12 @@ void sigchld_listener_callback() {
     int pid;
     while ((pid = waitpid(-1, &sigchld_status, __WALL | WNOHANG)) != 0) {
       if (pid == -1) {
-        if (tracing_state == STOPPED && errno == ECHILD) break;
+        if (errno == ECHILD) break;
+        if (errno == EINTR) continue;
+
         PLOGE("waitpid");
+
+        break;
       }
 
       if (pid == 1) {
@@ -820,27 +849,64 @@ void sigchld_listener_stop() {
   sigchld_process_count = 0;
 }
 
-static char pre_section[1024];
-static char post_section[1024];
+static char pre_section[4096];
+static char post_section[4096];
 
-#define WRITE_STATUS_ABI(suffix)                                                     \
-  if (status ## suffix.supported) {                                                  \
-    strcat(status_text, ", ReZygisk " # suffix "-bit: ");                            \
-                                                                                     \
-    if (tracing_state != TRACING) strcat(status_text, "❌");                         \
-    else if (status ## suffix.zygote_injected && status ## suffix.daemon_running)    \
-      strcat(status_text, "✅");                                                     \
-    else strcat(status_text, "⚠️");                                                  \
-                                                                                     \
-    if (!status ## suffix.daemon_running) {                                          \
-      if (status ## suffix.daemon_error_info) {                                      \
-        strcat(status_text, "(ReZygiskd: ");                                         \
-        strcat(status_text, status ## suffix.daemon_error_info);                     \
-        strcat(status_text, ")");                                                    \
-      } else {                                                                       \
-        strcat(status_text, "(ReZygiskd: not running)");                             \
-      }                                                                              \
-    }                                                                                \
+static void append_bounded(char *restrict dst, size_t cap, const char *restrict src) {
+  size_t used = strlen(dst);
+  if (used + 1 >= cap) return;
+
+  snprintf(dst + used, cap - used, "%s", src);
+}
+
+static const char *json_escaped(const char *restrict in, char *restrict out, size_t cap) {
+  size_t o = 0;
+
+  if (in == NULL) {
+    out[0] = '\0';
+
+    return out;
+  }
+
+  for (size_t i = 0; in[i] != '\0' && o + 7 < cap; i++) {
+    unsigned char c = (unsigned char)in[i];
+
+    switch (c) {
+      case '"': { out[o++] = '\\'; out[o++] = '"'; break; }
+      case '\\': { out[o++] = '\\'; out[o++] = '\\'; break; }
+      case '\n': { out[o++] = '\\'; out[o++] = 'n'; break; }
+      case '\r': { out[o++] = '\\'; out[o++] = 'r'; break; }
+      case '\t': { out[o++] = '\\'; out[o++] = 't'; break; }
+      default: {
+        if (c < 0x20) o += (size_t)snprintf(out + o, cap - o, "\\u%04x", c);
+        else out[o++] = (char)c;
+      }
+    }
+  }
+
+  out[o] = '\0';
+
+  return out;
+}
+
+#define WRITE_STATUS_ABI(suffix)                                                           \
+  if (status ## suffix.supported) {                                                        \
+    append_bounded(status_text, sizeof(status_text), ", ReZygisk " # suffix "-bit: ");      \
+                                                                                           \
+    if (tracing_state != TRACING) append_bounded(status_text, sizeof(status_text), "❌");   \
+    else if (status ## suffix.zygote_injected && status ## suffix.daemon_running)           \
+      append_bounded(status_text, sizeof(status_text), "✅");                               \
+    else append_bounded(status_text, sizeof(status_text), "⚠️");                            \
+                                                                                           \
+    if (!status ## suffix.daemon_running) {                                                \
+      if (status ## suffix.daemon_error_info) {                                            \
+        append_bounded(status_text, sizeof(status_text), "(ReZygiskd: ");                   \
+        append_bounded(status_text, sizeof(status_text), status ## suffix.daemon_error_info); \
+        append_bounded(status_text, sizeof(status_text), ")");                              \
+      } else {                                                                             \
+        append_bounded(status_text, sizeof(status_text), "(ReZygiskd: not running)");       \
+      }                                                                                    \
+    }                                                                                      \
   }
 
 static bool update_status(const char *message) {
@@ -858,21 +924,21 @@ static bool update_status(const char *message) {
     return true;
   }
 
-  char status_text[256] = "Monitor: ";
+  char status_text[512] = "Monitor: ";
   switch (tracing_state) {
     case TRACING: {
-      strcat(status_text, "✅");
+      append_bounded(status_text, sizeof(status_text), "✅");
 
       break;
     }
     case STOPPING: [[fallthrough]];
     case STOPPED: {
-      strcat(status_text, "⛔");
+      append_bounded(status_text, sizeof(status_text), "⛔");
 
       break;
     }
     case EXITING: {
-      strcat(status_text, "❌");
+      append_bounded(status_text, sizeof(status_text), "❌");
 
       break;
     }
@@ -892,12 +958,14 @@ static bool update_status(const char *message) {
       return false;
     }
 
+    char escaped[1024];
+
     fprintf(json, "{\n");
-    fprintf(json, "  \"root\": \"%s\",\n", environment_information64.root_impl ? environment_information64.root_impl : environment_information32.root_impl);
+    fprintf(json, "  \"root\": \"%s\",\n", json_escaped(environment_information64.root_impl ? environment_information64.root_impl : environment_information32.root_impl, escaped, sizeof(escaped)));
 
     fprintf(json, "  \"monitor\": {\n");
-    fprintf(json, "    \"state\": \"%d\"", tracing_state);
-    if (monitor_stop_reason) fprintf(json, ",\n    \"reason\": \"%s\",\n", monitor_stop_reason);
+    fprintf(json, "    \"state\": %d", tracing_state);
+    if (monitor_stop_reason) fprintf(json, ",\n    \"reason\": \"%s\"\n", json_escaped(monitor_stop_reason, escaped, sizeof(escaped)));
     else fprintf(json, "\n");
 
     if (status64.supported || status32.supported)
@@ -911,12 +979,12 @@ static bool update_status(const char *message) {
       if (status64.supported) {
         fprintf(json, "    \"64\": {\n");
         fprintf(json, "      \"state\": %d,\n", status64.daemon_running);
-        if (status64.daemon_error_info) fprintf(json, "      \"reason\": \"%s\",\n", status64.daemon_error_info);
+        if (status64.daemon_error_info) fprintf(json, "      \"reason\": \"%s\",\n", json_escaped(status64.daemon_error_info, escaped, sizeof(escaped)));
         fprintf(json, "      \"modules\": [");
 
         if (environment_information64.modules) for (uint32_t i = 0; i < environment_information64.modules_len; i++) {
           if (i > 0) fprintf(json, ", ");
-          fprintf(json, "\"%s\"", environment_information64.modules[i]);
+          fprintf(json, "\"%s\"", json_escaped(environment_information64.modules[i], escaped, sizeof(escaped)));
         }
 
         fprintf(json, "]\n");
@@ -928,12 +996,12 @@ static bool update_status(const char *message) {
       if (status32.supported) {
         fprintf(json, "    \"32\": {\n");
         fprintf(json, "      \"state\": %d,\n", status32.daemon_running);
-        if (status32.daemon_error_info) fprintf(json, "      \"reason\": \"%s\",\n", status32.daemon_error_info);
+        if (status32.daemon_error_info) fprintf(json, "      \"reason\": \"%s\",\n", json_escaped(status32.daemon_error_info, escaped, sizeof(escaped)));
         fprintf(json, "      \"modules\": [");
 
         if (environment_information32.modules) for (uint32_t i = 0; i < environment_information32.modules_len; i++) {
           if (i > 0) fprintf(json, ", ");
-          fprintf(json, "\"%s\"", environment_information32.modules[i]);
+          fprintf(json, "\"%s\"", json_escaped(environment_information32.modules[i], escaped, sizeof(escaped)));
         }
 
         fprintf(json, "]\n");
@@ -945,10 +1013,10 @@ static bool update_status(const char *message) {
       fprintf(json, "  \"zygote\": {\n");
       if (status64.supported) {
         fprintf(json, "    \"64\": %d", status64.zygote_injected);
-        if (status32.supported && status32.zygote_injected) fprintf(json, ",\n");
+        if (status32.supported) fprintf(json, ",\n");
         else fprintf(json, "\n");
       }
-      if (status32.supported && status32.zygote_injected) {
+      if (status32.supported) {
         fprintf(json, "    \"32\": %d\n", status32.zygote_injected);
       }
       fprintf(json, "  }\n");
@@ -981,15 +1049,15 @@ static bool prepare_environment() {
   char line[1024];
   while (fgets(line, sizeof(line), orig_prop) != NULL) {
     if (strncmp(line, "description=", strlen("description=")) == 0) {
-      strcat(pre_section, "description=");
-      strcat(post_section, line + strlen("description="));
+      append_bounded(pre_section, sizeof(pre_section), "description=");
+      append_bounded(post_section, sizeof(post_section), line + strlen("description="));
       after_description = true;
 
       continue;
     }
 
-    if (after_description) strcat(post_section, line);
-    else strcat(pre_section, line);
+    if (after_description) append_bounded(post_section, sizeof(post_section), line);
+    else append_bounded(pre_section, sizeof(pre_section), line);
   }
 
   fclose(orig_prop);

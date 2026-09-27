@@ -43,6 +43,8 @@ enum mount_namespace_state {
 
 #define TMP_PATH "/data/adb/rezygisk"
 
+#define MAX_MODULES 512
+
 static inline const char *rezygiskd_get_path() {
   return TMP_PATH;
 }

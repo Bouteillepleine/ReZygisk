@@ -1,3 +1,4 @@
+#include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -25,9 +26,16 @@ int main(int argc, char **argv) {
                  so we just delay for Tango Zygote. */
       if (do_restart && !is_tango) rezygiskd_zygote_restart();
 
-      long pid = strtol(argv[2], 0, 0);
-      if (!trace_zygote(pid, is_tango)) {
-        kill(pid, SIGKILL);
+      char *pid_end = NULL;
+      long pid = strtol(argv[2], &pid_end, 10);
+      if (pid_end == argv[2] || *pid_end != '\0' || pid < 2 || pid > INT_MAX) {
+        printf("[ReZygisk]: Invalid pid \"%s\"\n", argv[2]);
+
+        return 1;
+      }
+
+      if (!trace_zygote((int)pid, is_tango)) {
+        kill((pid_t)pid, SIGKILL);
 
         return 1;
       }
@@ -35,7 +43,7 @@ int main(int argc, char **argv) {
       if (do_restart && is_tango) rezygiskd_zygote_restart();
 
       return 0;
-  } else if (argc >= 2 && strcmp(argv[1], "ctl") == 0) {
+  } else if (argc >= 3 && strcmp(argv[1], "ctl") == 0) {
     enum rezygiskd_command command;
 
     if (strcmp(argv[2], "start") == 0) command = START;
@@ -61,7 +69,7 @@ int main(int argc, char **argv) {
 
     return 0;
   } else if (argc >= 2 && strcmp(argv[1], "info") == 0) {
-    struct rezygisk_info info;
+    struct rezygisk_info info = { 0 };
     rezygiskd_get_info(&info);
 
     printf("Daemon process PID: %d\n", info.pid);

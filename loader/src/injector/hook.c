@@ -1057,24 +1057,18 @@ static void rz_app_specialize_pre(struct zygisk_context *ctx) {
     */
     const char *data_dir = (*ctx->env)->GetStringUTFChars(ctx->env, *ctx->args.app->app_data_dir, NULL);
     if (!data_dir) {
-      LOGE("Failed to get app data directory");
-
-      return;
-    }
-
-    struct stat st;
-    if (stat(data_dir, &st) == -1) {
-      PLOGE("Failed to stat app data directory [%s]", data_dir);
+      LOGE("Failed to get app data directory, falling back to the isolated UID");
+    } else {
+      struct stat st;
+      if (stat(data_dir, &st) == -1) {
+        PLOGE("Failed to stat app data directory [%s], falling back to the isolated UID", data_dir);
+      } else {
+        uid = st.st_uid;
+        LOGD("Isolated service being related to UID %d, app data dir: %s", uid, data_dir);
+      }
 
       (*ctx->env)->ReleaseStringUTFChars(ctx->env, *ctx->args.app->app_data_dir, data_dir);
-
-      return;
     }
-
-    uid = st.st_uid;
-    LOGD("Isolated service being related to UID %d, app data dir: %s", uid, data_dir);
-
-    (*ctx->env)->ReleaseStringUTFChars(ctx->env, *ctx->args.app->app_data_dir, data_dir);
   }
 
   ctx->info_flags = rezygiskd_get_process_flags(uid, ctx->process);

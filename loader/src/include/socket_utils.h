@@ -1,6 +1,8 @@
 #ifndef SOCKET_UTILS_H
 #define SOCKET_UTILS_H
 
+#define MAX_STRING_LEN 65536
+
 #include <stdint.h>
 
 #include <sys/types.h>

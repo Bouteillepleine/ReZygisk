@@ -27,8 +27,9 @@ static int rezygiskd_connect(uint8_t retry) {
   */
   strcpy(addr.sun_path, TMP_PATH "/" SOCKET_FILE_NAME);
 
-  retry++;
-  while (--retry) {
+  if (retry == 0) retry = 1;
+
+  for (uint8_t attempt = 0; attempt < retry; attempt++) {
     int fd = socket(PF_UNIX, SOCK_STREAM | SOCK_CLOEXEC, 0);
     if (fd == -1) {
       PLOGE("socket");
@@ -36,21 +37,13 @@ static int rezygiskd_connect(uint8_t retry) {
       return -1;
     }
 
-    int ret = connect(fd, (struct sockaddr *)&addr, sizeof(addr));
-    if (ret == -1) {
-      PLOGE("connect (retry: %d)", retry);
+    if (connect(fd, (struct sockaddr *)&addr, sizeof(addr)) == 0) return fd;
 
-      close(fd);
+    PLOGE("connect (attempt %d/%d)", attempt + 1, retry);
 
-      if (retry == 1) return -1;
+    close(fd);
 
-      sleep(1);
-
-      /* INFO: Try again with a new socket; fd is closed here. */
-      continue;
-    }
-
-    return fd;
+    if (attempt + 1 < retry) sleep(1);
   }
 
   return -1;
@@ -133,7 +126,18 @@ void rezygiskd_get_info(struct rezygisk_info *info) {
     return;
   }
 
-  info->modules.modules = (char **)malloc(sizeof(char *) * info->modules.modules_count);
+  if (info->modules.modules_count > MAX_MODULES) {
+    LOGE("Refusing implausible module count %zu", info->modules.modules_count);
+
+    info->modules.modules = NULL;
+    info->modules.modules_count = 0;
+
+    close(fd);
+
+    return;
+  }
+
+  info->modules.modules = (char **)calloc(info->modules.modules_count, sizeof(char *));
   if (!info->modules.modules) {
     PLOGE("allocating modules name memory");
 
@@ -232,7 +236,15 @@ bool rezygiskd_read_modules(struct zygisk_modules *modules) {
   size_t len = 0;
   safe_read(read_size_t(fd, &len), "modules count", return false);
 
-  modules->modules = malloc(len * sizeof(char *));
+  if (len > MAX_MODULES) {
+    LOGE("Refusing implausible module count %zu", len);
+
+    close(fd);
+
+    return false;
+  }
+
+  modules->modules = calloc(len, sizeof(char *));
   if (!modules->modules) {
     PLOGE("allocating modules name memory");
 

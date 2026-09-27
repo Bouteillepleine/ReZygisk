@@ -176,6 +176,12 @@ char *read_string(int fd) {
     return NULL;
   }
 
+  if (str_len > MAX_STRING_LEN) {
+    LOGE("Refusing implausible string length %zu.\n", str_len);
+
+    return NULL;
+  }
+
   char *buf = malloc(str_len + 1);
   if (buf == NULL) {
     PLOGE("allocate memory for string");
