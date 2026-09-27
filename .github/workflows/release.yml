@@ -16,7 +16,6 @@ jobs:
   release:
     name: Build and release
     runs-on: ubuntu-latest
-    environment: signing
     permissions:
       contents: write
     steps:
@@ -32,26 +31,6 @@ jobs:
 
       - name: Build
         run: make all -j"$(nproc)"
-
-      # INFO: The signing key is only written after the build, so no Makefile,
-      #         submodule or sign.py build step ever runs with it present.
-      - name: Sign
-        env:
-          private_key: ${{ secrets.ORG_PRIVATE_KEY }}
-          public_key: ${{ secrets.ORG_PUBLIC_KEY }}
-        run: |
-          if [ -z "$private_key" ] || [ -z "$public_key" ]; then
-            echo "::notice::No signing keys configured, publishing unsigned builds."
-            exit 0
-          fi
-
-          echo "$private_key" | base64 -d > module/private_key
-          echo "$public_key" | base64 -d > module/public_key
-
-          make BUILD_TYPE=release sign
-          make BUILD_TYPE=debug sign
-
-          rm -f module/private_key module/public_key
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v7
