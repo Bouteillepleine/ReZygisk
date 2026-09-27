@@ -123,7 +123,7 @@ if [ ! -s "$WEBROOT_SUMS" ]; then
   abort    "*********************************************************"
 fi
 
-if ! sha256sum -c -s "$WEBROOT_SUMS"; then
+if ! sha256sum -c "$WEBROOT_SUMS" > /dev/null 2>&1; then
   ui_print "*********************************************************"
   ui_print "! Failed to verify the webroot"
   ui_print "! This zip may be corrupted, please try downloading again"
