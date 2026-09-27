@@ -34,7 +34,7 @@ async function _getVersion() {
 
   let version = '???'
   moduleProp.stdout.split('\n').forEach((line) => {
-    if (line.startsWith('version=')) version = line.split('=')[1]
+    if (line.startsWith('version=')) version = line.slice('version='.length).trim()
   })
 
   return version
@@ -47,7 +47,7 @@ async function _getKernelString() {
     return '???'
   }
 
-  if (unameCmd.stdout && unameCmd.stdout.length !== 0) {
+  if (unameCmd.stdout && unameCmd.stdout.trim().length !== 0) {
     return unameCmd.stdout.trim()
   } else {
     return '???'
@@ -61,11 +61,19 @@ async function _getAndroidVersion() {
     return '???'
   }
 
-  if (androidVersionCmd.stdout && androidVersionCmd.stdout.length !== 0) {
-    return androidVersionCmd.stdout
+  if (androidVersionCmd.stdout && androidVersionCmd.stdout.trim().length !== 0) {
+    return androidVersionCmd.stdout.trim()
   } else {
     return '???'
   }
+}
+
+function _setStateIcon(container, icon) {
+  const img = document.createElement('img')
+  img.src = `assets/${icon}.svg`
+  img.alt = ''
+
+  container.replaceChildren(img)
 }
 
 async function _updateDynamicElement(firstRun, ReZygiskState, strings) {
@@ -89,70 +97,54 @@ async function _updateDynamicElement(firstRun, ReZygiskState, strings) {
   })
 
   if (ReZygiskState == null) {
-    rz_state.innerHTML = strings.unknown
-    rz_icon_state.innerHTML = '<img class="brightc" src="assets/mark.svg">'
+    rz_state.textContent = strings.unknown
+    _setStateIcon(rz_icon_state, 'mark')
     document.getElementById('zygote_class').style.display = 'none'
     /* INFO: This hides the throbber screen */
     loading_screen.style.display = 'none'
     return;
   }
 
-  if (firstRun) {
-    rzState.expectedWorking = ReZygiskState.zygote === undefined ? 0 : (ReZygiskState.zygote['64'] !== undefined ? 1 : 0) + (ReZygiskState.zygote['32'] !== undefined ? 1 : 0)
-  }
+  const zygote = ReZygiskState.zygote || {}
 
-  if (ReZygiskState.zygote['64'] && ReZygiskState.zygote !== undefined) {
-    const zygote64 = ReZygiskState.zygote['64']
+  rzState.expectedWorking = 0
+  rzState.actuallyWorking = 0
 
-    zygote_divs[0].style.display = 'block'
+  const bits = [ '64', '32' ]
+  bits.forEach((abi, index) => {
+    if (zygote[abi] === undefined) return
 
-    switch (zygote64) {
+    rzState.expectedWorking++
+
+    zygote_divs[index].style.display = 'block'
+
+    switch (Number(zygote[abi])) {
       case 1: {
-        zygote_status_divs[0].innerHTML = strings.info.zygote.injected
-
-        if (firstRun) rzState.actuallyWorking++
+        zygote_status_divs[index].textContent = strings.info.zygote.injected
+        rzState.actuallyWorking++
 
         break
       }
-      case 0: zygote_status_divs[0].innerHTML = strings.info.zygote.notInjected; break
-      default: zygote_status_divs[0].innerHTML = strings.info.zygote.unknown
+      case 0: zygote_status_divs[index].textContent = strings.info.zygote.notInjected; break
+      default: zygote_status_divs[index].textContent = strings.info.zygote.unknown
     }
-  }
-
-  if (ReZygiskState.zygote && ReZygiskState.zygote['32'] !== undefined) {
-    const zygote32 = ReZygiskState.zygote['32']
-
-    zygote_divs[1].style.display = 'block'
-
-    switch (zygote32) {
-      case 1: {
-        zygote_status_divs[1].innerHTML = strings.info.zygote.injected
-
-        if (firstRun) rzState.actuallyWorking++
-
-        break
-      }
-      case 0: zygote_status_divs[1].innerHTML = strings.info.zygote.notInjected; break
-      default: zygote_status_divs[1].innerHTML = strings.info.zygote.unknown
-    }
-  }
+  })
 
   if (rzState.expectedWorking === 0 || rzState.actuallyWorking === 0) {
-    rz_state.innerHTML = strings.status.notWorking
-    document.getElementById('zygote_class').style.display = 'none'
+    rz_state.textContent = strings.status.notWorking
+    _setStateIcon(rz_icon_state, 'mark')
+    rootCss.style.setProperty('--state', 'var(--state-error)')
   } else if (rzState.expectedWorking === rzState.actuallyWorking) {
-    rz_state.innerHTML = strings.status.ok
-
-    rootCss.style.setProperty('--bright', '#545454')
-    rz_icon_state.innerHTML = '<img class="brightc" src="assets/tick.svg">'
+    rz_state.textContent = strings.status.ok
+    _setStateIcon(rz_icon_state, 'tick')
+    rootCss.style.setProperty('--state', 'var(--state-ok)')
   } else {
-    rz_state.innerHTML = strings.status.partially
-
-    rootCss.style.setProperty('--bright', '#766000')
-    rz_icon_state.innerHTML = '<img class="brightc" src="assets/warn.svg">'
+    rz_state.textContent = strings.status.partially
+    _setStateIcon(rz_icon_state, 'warn')
+    rootCss.style.setProperty('--state', 'var(--state-warn)')
   }
 
-  if (ReZygiskState.zygote === undefined) {
+  if (rzState.expectedWorking === 0) {
     document.getElementById('zygote_class').style.display = 'none'
   }
 }
@@ -162,10 +154,10 @@ export async function loadOnce() {
 }
 
 export async function loadOnceView() {
-  document.getElementById('version_code').innerHTML = await _getVersion()
+  document.getElementById('version_code').textContent = await _getVersion()
 
-  document.getElementById('kernel_version_div').innerHTML = await _getKernelString()
-  document.getElementById('android_version_div').innerHTML = await _getAndroidVersion()
+  document.getElementById('kernel_version_div').textContent = await _getKernelString()
+  document.getElementById('android_version_div').textContent = await _getAndroidVersion()
 
   const ReZygiskState = await _getReZygiskState()
   const strings = await getStrings(whichCurrentPage())
@@ -174,7 +166,7 @@ export async function loadOnceView() {
   if (!root_impl) root_impl = strings.unknown
   if (root_impl === 'Multiple') root_impl = strings.rootImpls.multiple
 
-  document.getElementById('root_impl').innerHTML = root_impl
+  document.getElementById('root_impl').textContent = root_impl
 
   _updateDynamicElement(true, ReZygiskState, strings)
 

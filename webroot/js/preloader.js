@@ -25,15 +25,22 @@ if (ConfigState.enableSystemFont) {
 }
 
 /* INFO: This code are meant to load the link with any card have credit-link attribute inside it */
+const SAFE_LINK = /^[A-Za-z0-9._~/-]+$/
+
 document.addEventListener('click', async (event) => {
   const getLink = event.target.getAttribute('credit-link')
   if (!getLink || typeof getLink !== 'string') return;
 
-  const ptrace64Cmd = await exec(`am start -a android.intent.action.VIEW -d https://${getLink}`).catch(() => {
-    return window.open(`https://${getLink}`, "_blank", 'toolbar=0,location=0,menubar=0')
-  })
+  if (!SAFE_LINK.test(getLink)) {
+    console.error('Refusing to open an unexpected credit-link:', getLink)
 
-  if (ptrace64Cmd.errno !== 0) return window.open(`https://${getLink}`, "_blank", 'toolbar=0,location=0,menubar=0')
+    return
+  }
+
+  const openExternally = () => window.open(`https://${getLink}`, '_blank', 'toolbar=0,location=0,menubar=0')
+
+  const viewCmd = await exec(`am start -a android.intent.action.VIEW -d https://${getLink}`).catch(() => null)
+  if (!viewCmd || viewCmd.errno !== 0) openExternally()
 }, false)
 
 window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (event) => {

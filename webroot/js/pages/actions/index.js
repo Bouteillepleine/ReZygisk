@@ -12,10 +12,33 @@ async function _getMonitorState() {
 
   try {
     const ReZygiskState = JSON.parse(stateCmd.stdout)
+
     return ReZygiskState.monitor.state
   } catch {
     return null;
   }
+}
+
+let tracerBinary = null
+
+async function _getTracerBinary() {
+  if (tracerBinary) return tracerBinary
+
+  const probe = await exec('for b in 64 32; do if [ -x "/data/adb/modules/rezygisk/bin/zygisk-ptrace$b" ]; then echo "$b"; break; fi; done')
+  const bits = probe.errno === 0 && probe.stdout.trim() === '32' ? '32' : '64'
+
+  tracerBinary = `/data/adb/modules/rezygisk/bin/zygisk-ptrace${bits}`
+
+  return tracerBinary
+}
+
+async function _sendControl(command) {
+  const binary = await _getTracerBinary()
+
+  const result = await exec(`${binary} ctl ${command}`)
+  if (result.errno !== 0) toast('Failed to reach the ReZygisk monitor!')
+
+  return result.errno === 0
 }
 
 async function _updateDynamicElement() {
@@ -25,12 +48,12 @@ async function _updateDynamicElement() {
 
   if (monitorState == null) return;
 
-  switch (monitorState) {
-    case '0': monitor_status.innerHTML = strings.monitor.status.tracing; break;
-    case '1': monitor_status.innerHTML = strings.monitor.status.stopping; break;
-    case '2': monitor_status.innerHTML = strings.monitor.status.stopped; break;
-    case '3': monitor_status.innerHTML = strings.monitor.status.exiting; break;
-    default: monitor_status.innerHTML = strings.monitor.status.unknown;
+  switch (Number(monitorState)) {
+    case 0: monitor_status.textContent = strings.monitor.status.tracing; break;
+    case 1: monitor_status.textContent = strings.monitor.status.stopping; break;
+    case 2: monitor_status.textContent = strings.monitor.status.stopped; break;
+    case 3: monitor_status.textContent = strings.monitor.status.exiting; break;
+    default: monitor_status.textContent = strings.monitor.status.unknown;
   }
 }
 
@@ -53,21 +76,29 @@ export async function load() {
   const monitor_status = document.getElementById('monitor_status')
   const strings = await getStrings(whichCurrentPage())
 
-  monitor_start.addEventListener('click', () => {
-    if (![ strings.monitor.status.tracing, strings.monitor.status.stopping, strings.monitor.status.stopped ].includes(monitor_status.innerHTML)) return;
-    monitor_status.innerHTML = strings.monitor.status.tracing
-    exec('/data/adb/modules/rezygisk/bin/zygisk-ptrace64 ctl start')
+  const controllable = [
+    strings.monitor.status.tracing,
+    strings.monitor.status.stopping,
+    strings.monitor.status.stopped
+  ]
+
+  monitor_start.addEventListener('click', async () => {
+    if (!controllable.includes(monitor_status.textContent)) return;
+
+    monitor_status.textContent = strings.monitor.status.tracing
+    await _sendControl('start')
   })
 
-  monitor_stop.addEventListener('click', () => {
-    monitor_status.innerHTML = strings.monitor.status.exiting
-    exec('/data/adb/modules/rezygisk/bin/zygisk-ptrace64 ctl exit')
+  monitor_stop.addEventListener('click', async () => {
+    monitor_status.textContent = strings.monitor.status.exiting
+    await _sendControl('exit')
   })
 
-  monitor_pause.addEventListener('click', () => {
-    if (![ strings.monitor.status.tracing, strings.monitor.status.stopping, strings.monitor.status.stopped ].includes(monitor_status.innerHTML)) return;
-    monitor_status.innerHTML = strings.monitor.status.stopped
-    exec('/data/adb/modules/rezygisk/bin/zygisk-ptrace64 ctl stop')
+  monitor_pause.addEventListener('click', async () => {
+    if (!controllable.includes(monitor_status.textContent)) return;
+
+    monitor_status.textContent = strings.monitor.status.stopped
+    await _sendControl('stop')
   })
 
   return;

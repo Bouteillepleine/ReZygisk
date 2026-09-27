@@ -638,7 +638,7 @@ window.addEventListener('error', function (event) {
 
   console.error('Unhandled error:', event.error)
 
-  exec(`echo "Error: ${event.message}\n\n${event.error.stack}" > /data/adb/rezygisk/webui_error.log`)
+  console.error('Uncaught error:', event.message, event.error)
 })
 
 window.addEventListener('unhandledrejection', function (event) {
@@ -646,7 +646,7 @@ window.addEventListener('unhandledrejection', function (event) {
 
   console.error('Unhandled promise rejection:', event.reason)
 
-  exec(`echo "Error (Unhandled Rejection): ${event.reason}\n\n${event.reason.stack}" > /data/adb/rezygisk/webui_error.log`)
+  console.error('Unhandled promise rejection:', event.reason)
 })
 
 window.addEventListener('popstate', async () => {
