@@ -44,18 +44,18 @@
 }
 
 .button_primary {
-  background-color: var(--button-enabled);
+  background-color: var(--accent);
   border-color: transparent;
-  color: var(--lock);
+  color: #ffffff;
 }
 
 .button_primary:active {
-  background-color: var(--button-enabled);
+  background-color: var(--accent);
   filter: brightness(1.12);
 }
 
 .button_danger {
-  color: #e59aa4;
+  color: var(--danger);
 }
 
 @media (min-width: 560px) {

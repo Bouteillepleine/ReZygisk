@@ -13,6 +13,9 @@ export function setAmoled(chooseSet) {
   rootCss.style.setProperty('--desktop-navicon', '#242424ff')
   rootCss.style.setProperty('--icon-filter', 'invert(1)')
   rootCss.style.setProperty('--button', 'var(--background)')
+  rootCss.style.setProperty('--outline', 'rgba(255, 255, 255, 0.18)')
+  rootCss.style.setProperty('--outline-strong', 'rgba(255, 255, 255, 0.32)')
+  rootCss.style.setProperty('--danger', '#e79ba3')
 
   if (chooseSet) setData('amoled')
   setDarkNav()

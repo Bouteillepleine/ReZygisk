@@ -15,6 +15,9 @@ export function setLight(chooseSet) {
   rootCss.style.setProperty('--button-enabled', '#eeeeee')
   rootCss.style.setProperty('--icon-bc', '#c9c9c9')
   rootCss.style.setProperty('--button', '#b3b3b3')
+  rootCss.style.setProperty('--outline', 'rgba(0, 0, 0, 0.14)')
+  rootCss.style.setProperty('--outline-strong', 'rgba(0, 0, 0, 0.26)')
+  rootCss.style.setProperty('--danger', '#a3261f')
 
   if (chooseSet) setData('light')
 

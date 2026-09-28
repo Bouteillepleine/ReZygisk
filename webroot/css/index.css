@@ -19,12 +19,17 @@
   --surface-highest: var(--dim-brigther);
   --small-card: var(--surface-high);
 
-  /* INFO: Neutral at low alpha so it reads on both light and dark palettes */
-  --outline: rgba(130, 132, 148, 0.22);
-  --outline-strong: rgba(130, 132, 148, 0.38);
+  /* INFO: Fallbacks only. Each theme overrides these on :root at runtime,
+             because a single alpha cannot carry both a #f2f2f2 and a #000000
+             background. */
+  --outline: rgba(255, 255, 255, 0.15);
+  --outline-strong: rgba(255, 255, 255, 0.28);
   --scrim: rgba(0, 0, 0, 0.32);
 
-  --state-ok: #4f7a63;
+  --accent: #3f6ea3;
+  --danger: #e79ba3;
+
+  --state-ok: var(--accent);
   --state-warn: #7d6534;
   --state-error: #7b4048;
   --state: var(--state-error);
@@ -132,6 +137,12 @@ a {
   background-color: var(--surface);
   color: var(--font);
   box-shadow: var(--shadow-1);
+}
+
+.row + .row,
+.card,
+.small_card {
+  border-color: var(--outline);
 }
 
 .surface {

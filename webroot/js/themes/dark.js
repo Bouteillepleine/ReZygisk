@@ -14,6 +14,9 @@ export function setDark(chooseSet) {
   rootCss.style.setProperty('--icon-filter', 'invert(1)')
   rootCss.style.setProperty('--desktop-navicon', '#3a3a3a')
   rootCss.style.setProperty('--button', 'var(--background)')
+  rootCss.style.setProperty('--outline', 'rgba(255, 255, 255, 0.15)')
+  rootCss.style.setProperty('--outline-strong', 'rgba(255, 255, 255, 0.28)')
+  rootCss.style.setProperty('--danger', '#e79ba3')
 
   if (chooseSet) setData('dark')
   setDarkNav()

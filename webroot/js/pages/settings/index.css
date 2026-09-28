@@ -58,19 +58,21 @@
   left: 4px;
   top: 4px;
   transition: transform var(--dur) var(--ease), background-color var(--dur) var(--ease);
-  background-color: var(--desc);
+  background-color: var(--font);
   border-radius: 50%;
   transform: scale(0.8);
+  opacity: 0.55;
 }
 
 input:checked + .slider {
-  background-color: var(--button-enabled);
+  background-color: var(--accent);
   border-color: transparent;
 }
 
 input:checked + .slider:before {
   transform: translateX(20px) scale(1);
-  background-color: var(--lock);
+  background-color: #ffffff;
+  opacity: 1;
 }
 
 .action_card {
