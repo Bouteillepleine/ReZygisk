@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <stddef.h>
 #include <string.h>
 #include <errno.h>
 
@@ -119,6 +120,35 @@ static bool get_current_attr(char *restrict output, size_t size) {
   return true;
 }
 
+/*
+  INFO: Bind/connect in the abstract namespace: sun_path[0] stays NUL and the name
+        follows it, so the socket has no filesystem path at all.
+
+        A path-bound unix socket publishes its path in /proc/net/unix, which any
+        app can read without privilege. Measured on OP15: an ordinary app uid --
+        and a uid on the hide list -- both saw "/data/adb/rezygisk/cp64.sock" and
+        "/data/adb/rezygisk/init_monitor" listed there, which discloses the whole
+        install location on its own. Abstract sockets are still listed, but as a
+        bare name with no path, so nothing about where we live leaks.
+
+        The name used is the basename of the path constant the caller already
+        passes, so both binaries derive the same name from constants they already
+        agree on and there is nothing new to keep in sync.
+*/
+static socklen_t rzd_abstract_addr(struct sockaddr_un *addr, const char *path) {
+  memset(addr, 0, sizeof(*addr));
+  addr->sun_family = AF_UNIX;
+
+  const char *name = strrchr(path, '/');
+  name = name ? name + 1 : path;
+
+  size_t name_len = strlen(name);
+  if (name_len > sizeof(addr->sun_path) - 2) name_len = sizeof(addr->sun_path) - 2;
+  memcpy(addr->sun_path + 1, name, name_len);
+
+  return (socklen_t)(offsetof(struct sockaddr_un, sun_path) + 1 + name_len);
+}
+
 void unix_datagram_sendto(const char *restrict path, const void *restrict buf, size_t len) {
   char current_attr[PATH_MAX];
   if (!get_current_attr(current_attr, sizeof(current_attr))) {
@@ -129,10 +159,8 @@ void unix_datagram_sendto(const char *restrict path, const void *restrict buf, s
 
   set_socket_create_context(current_attr);
 
-  struct sockaddr_un addr = {
-    .sun_family = AF_UNIX
-  };
-  strncpy(addr.sun_path, path, sizeof(addr.sun_path) - 1);
+  struct sockaddr_un addr;
+  socklen_t socklen = rzd_abstract_addr(&addr, path);
 
   int socket_fd = socket(AF_UNIX, SOCK_DGRAM, 0);
   if (socket_fd == -1) {
@@ -143,7 +171,7 @@ void unix_datagram_sendto(const char *restrict path, const void *restrict buf, s
     return;
   }
 
-  if (connect(socket_fd, (struct sockaddr *)&addr, sizeof(addr)) == -1) {
+  if (connect(socket_fd, (struct sockaddr *)&addr, socklen) == -1) {
     LOGE("connect: %s", strerror(errno));
 
     close(socket_fd);
@@ -186,12 +214,10 @@ int unix_listener_from_path(const char *restrict path) {
     return -1;
   }
 
-  struct sockaddr_un addr = {
-    .sun_family = AF_UNIX
-  };
-  strncpy(addr.sun_path, path, sizeof(addr.sun_path) - 1);
+  struct sockaddr_un addr;
+  socklen_t bind_socklen = rzd_abstract_addr(&addr, path);
 
-  if (bind(socket_fd, (struct sockaddr *)&addr, sizeof(struct sockaddr_un)) == -1) {
+  if (bind(socket_fd, (struct sockaddr *)&addr, bind_socklen) == -1) {
     LOGE("bind: %s", strerror(errno));
 
     close(socket_fd);

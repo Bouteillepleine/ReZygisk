@@ -151,17 +151,7 @@ bool rezygiskd_listener_init() {
     .sun_path = { 0 }
   };
 
-  int sun_path_len = snprintf(addr.sun_path, sizeof(addr.sun_path), "%s/%s", rezygiskd_get_path(), SOCKET_NAME);
-  if (sun_path_len < 0 || (size_t)sun_path_len >= sizeof(addr.sun_path)) {
-    LOGE("monitor socket path does not fit");
-
-    close(monitor_sock_fd);
-    monitor_sock_fd = -1;
-
-    return false;
-  }
-
-  socklen_t socklen = sizeof(sa_family_t) + (socklen_t)sun_path_len;
+  socklen_t socklen = rzd_abstract_addr(&addr, SOCKET_NAME);
   if (bind(monitor_sock_fd, (struct sockaddr *)&addr, socklen) == -1) {
     PLOGE("bind socket");
 
@@ -1135,9 +1125,7 @@ int send_control_command(enum rezygiskd_command cmd) {
     .sun_path = { 0 }
   };
 
-  size_t sun_path_len = snprintf(addr.sun_path, sizeof(addr.sun_path), "%s/%s", rezygiskd_get_path(), SOCKET_NAME);
-
-  socklen_t socklen = sizeof(sa_family_t) + sun_path_len;
+  socklen_t socklen = rzd_abstract_addr(&addr, SOCKET_NAME);
 
   struct rzd_msg_header msg = {
     .cmd = cmd,

@@ -25,7 +25,7 @@ static int rezygiskd_connect(uint8_t retry) {
     Sources:
      - https://pubs.opengroup.org/onlinepubs/009696699/basedefs/sys/un.h.html
   */
-  strcpy(addr.sun_path, TMP_PATH "/" SOCKET_FILE_NAME);
+  socklen_t socklen = rzd_abstract_addr(&addr, TMP_PATH "/" SOCKET_FILE_NAME);
 
   if (retry == 0) retry = 1;
 
@@ -37,7 +37,7 @@ static int rezygiskd_connect(uint8_t retry) {
       return -1;
     }
 
-    if (connect(fd, (struct sockaddr *)&addr, sizeof(addr)) == 0) return fd;
+    if (connect(fd, (struct sockaddr *)&addr, socklen) == 0) return fd;
 
     PLOGE("connect (attempt %d/%d)", attempt + 1, retry);
 
