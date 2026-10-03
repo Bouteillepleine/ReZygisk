@@ -18,7 +18,6 @@
 
 #define SOCKET_NAME "init_monitor"
 
-#define MAX_CONTROL_STRING 4096
 #define MAX_CONTROL_MODULES 512
 
 #define STOPPED_WITH(sig, event) (WIFSTOPPED(sigchld_status) && (sigchld_status >> 8 == ((sig) | ((event) << 8))))
